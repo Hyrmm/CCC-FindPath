@@ -20,10 +20,6 @@ export default class Main extends cc.Component {
 
     start() {
 
-
-
-
-
         this.viewPort.on(cc.Node.EventType.TOUCH_START, this.onViewPortTouchStart, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, this.onViewPortTouchMove, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_END, this.onViewPortTouchEnd, this)
@@ -43,12 +39,19 @@ export default class Main extends cc.Component {
 
         const delta = event.touch.getDelta()
 
-        // 边界判断
-        if (Math.abs(this.mapContainer.x + delta.x) + this.mapTilSize.x / 2 >= this.mapOriSize.x / 2 || Math.abs(this.mapContainer.y + delta.y) + this.mapTilSize.y / 2 >= this.mapOriSize.y / 2) return
+        // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
+        const changePosY = this.mapContainer.y + delta.y
+        const changePosX = this.mapContainer.x + delta.x
 
-        this.mapContainer.x += delta.x
-        this.mapContainer.y += delta.y
+        if (Math.abs(changePosX) <= this.mapOriSize.x / 2 - this.viewPort.width / 2) {
+            this.mapContainer.x = changePosX
+        }
 
+        if (Math.abs(changePosY) <= this.mapOriSize.y / 2 - this.viewPort.height / 2) {
+            this.mapContainer.y = changePosY
+        }
+
+        
         this.updateViewPortMapTileNodes()
     }
 
