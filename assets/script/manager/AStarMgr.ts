@@ -1,4 +1,4 @@
-import { MinHeap } from "./DataStructure"
+import { MinHeap } from "../dataStructure/Heap"
 
 
 enum BlockType {
