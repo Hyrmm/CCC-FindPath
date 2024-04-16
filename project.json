@@ -1,0 +1,8 @@
+{
+  "engine": "cocos-creator-js",
+  "packages": "packages",
+  "name": "AStar",
+  "id": "fa20dfda-42e8-49ab-bb28-8c363da6ab5d",
+  "version": "2.4.11",
+  "isNew": false
+}
