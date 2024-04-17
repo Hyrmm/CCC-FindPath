@@ -1,6 +1,6 @@
 const { ccclass, property } = cc._decorator
 import { MapMgr } from './script/manager/MapMgr'
-import { QuadTreeNode } from './script/dataStructure/QuadTree'
+import { QuadTree } from './script/dataStructure/QuadTree'
 
 @ccclass
 export default class Main extends cc.Component {
@@ -15,6 +15,7 @@ export default class Main extends cc.Component {
     rolesContainer: cc.Node = null
 
     private isTouching: boolean = false
+    private mapQuadTree: QuadTree<cc.Node> = null
 
     private mapTilSize: cc.Vec2 = cc.v2(1024, 1024)
     private mapOriSize: cc.Vec2 = cc.v2(1024 * 7, 1024 * 4)
@@ -26,11 +27,17 @@ export default class Main extends cc.Component {
         this.viewPort.on(cc.Node.EventType.TOUCH_END, this.onViewPortTouchEnd, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_CANCEL, this.onViewPortTouchEnd, this)
 
-        // 四叉树根节点
-        const bounds: [number, number, number, number] = [-this.mapOriSize.x / 2, -this.mapOriSize.y / 2, this.mapOriSize.x / 2, this.mapOriSize.y / 2]
-        const rootNode = new QuadTreeNode<cc.Node>(bounds, this.mapContainer.children)
+        // 四叉树初始化
+        const rootBounds: [number, number, number, number] = [-this.mapOriSize.x / 2, -this.mapOriSize.y / 2, this.mapOriSize.x / 2, this.mapOriSize.y / 2]
+        const mapTileBoundsArr: Array<[number, number, number, number]> = new Array(this.mapContainer.children.length).fill([0, 0, 0, 0])
+        for (const [index, bounds] of mapTileBoundsArr.entries()) {
+            const tileNode = this.mapContainer.children[index]
+            console.log(tileNode.x,tileNode.y)
+            mapTileBoundsArr[index] = [tileNode.x, tileNode.y, tileNode.x, tileNode.y]
+        }
+        this.mapQuadTree = new QuadTree<cc.Node>(rootBounds, mapTileBoundsArr, this.mapContainer.children)
 
-        rootNode.subdivide()
+        // 首次地图可视范围更新
         this.updateViewPortMapTileNodes()
     }
 
@@ -69,23 +76,12 @@ export default class Main extends cc.Component {
 
         // 计算 viewport 中心坐标点
         const centerPos = new cc.Vec2(-this.mapContainer.x, -this.mapContainer.y)
-        
 
-
-        const viewPortRect = this.viewPort.getBoundingBoxToWorld()
-        const visiableMapTileNodes: Array<cc.Node> = []
+        // 判断视口与地图四叉树碰撞
+        const visiableTileNodes = this.mapQuadTree.queryIntersectsData([centerPos.x - this.viewPort.width / 2, centerPos.y - this.viewPort.height / 2, centerPos.x + this.viewPort.width / 2, centerPos.y + this.viewPort.height / 2])
 
         for (const tileNode of this.mapContainer.children) {
-            const tileRect = tileNode.getBoundingBoxToWorld()
-
-            if (tileRect.intersects(viewPortRect)) {
-                visiableMapTileNodes.push(tileNode)
-            }
-
-        }
-
-        for (const tileNode of this.mapContainer.children) {
-            if (visiableMapTileNodes.includes(tileNode)) {
+            if (visiableTileNodes.includes(tileNode)) {
                 tileNode.active = true
             } else {
                 tileNode.active = false
