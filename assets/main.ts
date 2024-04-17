@@ -1,5 +1,6 @@
 const { ccclass, property } = cc._decorator
 import { MapMgr } from './script/manager/MapMgr'
+import { QuadTreeNode } from './script/dataStructure/QuadTree'
 
 @ccclass
 export default class Main extends cc.Component {
@@ -25,6 +26,11 @@ export default class Main extends cc.Component {
         this.viewPort.on(cc.Node.EventType.TOUCH_END, this.onViewPortTouchEnd, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_CANCEL, this.onViewPortTouchEnd, this)
 
+        // 四叉树根节点
+        const bounds: [number, number, number, number] = [-this.mapOriSize.x / 2, -this.mapOriSize.y / 2, this.mapOriSize.x / 2, this.mapOriSize.y / 2]
+        const rootNode = new QuadTreeNode<cc.Node>(bounds, this.mapContainer.children)
+
+        rootNode.subdivide()
         this.updateViewPortMapTileNodes()
     }
 
@@ -51,7 +57,7 @@ export default class Main extends cc.Component {
             this.mapContainer.y = changePosY
         }
 
-        
+
         this.updateViewPortMapTileNodes()
     }
 
@@ -60,6 +66,10 @@ export default class Main extends cc.Component {
     }
 
     private updateViewPortMapTileNodes() {
+
+        // 计算 viewport 中心坐标点
+        const centerPos = new cc.Vec2(-this.mapContainer.x, -this.mapContainer.y)
+        
 
 
         const viewPortRect = this.viewPort.getBoundingBoxToWorld()
