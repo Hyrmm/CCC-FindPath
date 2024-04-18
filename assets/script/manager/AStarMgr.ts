@@ -72,6 +72,7 @@ export class AStarMgr {
 
             this.blocks.push(rowArray)
         }
+        
         this.rows = this.blocks.length
         this.lines = this.blocks[0].length
     }

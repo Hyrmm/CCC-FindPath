@@ -103,15 +103,13 @@ class QuadTreeNode<T> {
 
 export class QuadTree<T> {
 
-    public static minAreaSize: [number, number] = [448, 256]
-
     private root: QuadTreeNode<T>
 
-    constructor(boundary: [number, number, number, number], boundsArr: Array<[number, number, number, number]> = [], dataArr: Array<T> = []) {
+    constructor(boundary: [number, number, number, number], splitSize: number, boundsArr: Array<[number, number, number, number]> = [], dataArr: Array<T> = []) {
 
         this.root = new QuadTreeNode<T>(boundary)
 
-        this.root.subdivide(16)
+        this.root.subdivide(splitSize)
 
         for (const [index, bounds] of boundsArr.entries()) {
             this.root.insert(dataArr[index], bounds)

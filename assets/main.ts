@@ -1,6 +1,6 @@
 const { ccclass, property } = cc._decorator
-import { MapMgr } from './script/manager/MapMgr'
 import { QuadTree } from './script/dataStructure/QuadTree'
+import { AStarMgr } from './script/manager/AStarMgr'
 
 @ccclass
 export default class Main extends cc.Component {
@@ -16,33 +16,40 @@ export default class Main extends cc.Component {
 
     private isTouching: boolean = false
     private mapQuadTree: QuadTree<cc.Node> = null
-
-    private mapTilSize: cc.Vec2 = cc.v2(1024, 1024)
     private mapOriSize: cc.Vec2 = cc.v2(1024 * 7, 1024 * 4)
 
     start() {
 
+        // 地图拖动事件监听
         this.viewPort.on(cc.Node.EventType.TOUCH_START, this.onViewPortTouchStart, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, this.onViewPortTouchMove, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_END, this.onViewPortTouchEnd, this)
         this.viewPort.on(cc.Node.EventType.TOUCH_CANCEL, this.onViewPortTouchEnd, this)
 
-        // 四叉树初始化
+        // 四叉树初始化(用于动态加载地图)
         const rootBounds: [number, number, number, number] = [-this.mapOriSize.x / 2, -this.mapOriSize.y / 2, this.mapOriSize.x / 2, this.mapOriSize.y / 2]
         const mapTileBoundsArr: Array<[number, number, number, number]> = new Array(this.mapContainer.children.length).fill([0, 0, 0, 0])
         for (const [index, bounds] of mapTileBoundsArr.entries()) {
             const tileNode = this.mapContainer.children[index]
             mapTileBoundsArr[index] = [tileNode.x, tileNode.y, tileNode.x, tileNode.y]
         }
-        this.mapQuadTree = new QuadTree<cc.Node>(rootBounds, mapTileBoundsArr, this.mapContainer.children)
+        this.mapQuadTree = new QuadTree<cc.Node>(rootBounds, 16, mapTileBoundsArr, this.mapContainer.children)
+
+        // 寻路网格初始化
+        // const mapDataMatrix = new QuadTree<cc.Node>(rootBounds, 896, mapTileBoundsArr, this.mapContainer.children)
+
+
+        // AStarMgr.initMap(this.mapOriSize.x, this.mapOriSize.y, mapDataMatrix)
 
         // 首次地图可视范围更新
         this.updateViewPortMapTileNodes()
+
     }
 
 
     private onViewPortTouchStart(event: cc.Event.EventTouch) {
         this.isTouching = true
+        // AStarMgr.findPath()
     }
 
     private onViewPortTouchMove(event: cc.Event.EventTouch) {
@@ -57,10 +64,12 @@ export default class Main extends cc.Component {
 
         if (Math.abs(changePosX) <= this.mapOriSize.x / 2 - this.viewPort.width / 2) {
             this.mapContainer.x = changePosX
+            this.rolesContainer.x = changePosX
         }
 
         if (Math.abs(changePosY) <= this.mapOriSize.y / 2 - this.viewPort.height / 2) {
             this.mapContainer.y = changePosY
+            this.rolesContainer.y = changePosY
         }
 
 
