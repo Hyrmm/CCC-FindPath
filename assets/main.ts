@@ -32,7 +32,6 @@ export default class Main extends cc.Component {
         const mapTileBoundsArr: Array<[number, number, number, number]> = new Array(this.mapContainer.children.length).fill([0, 0, 0, 0])
         for (const [index, bounds] of mapTileBoundsArr.entries()) {
             const tileNode = this.mapContainer.children[index]
-            console.log(tileNode.x,tileNode.y)
             mapTileBoundsArr[index] = [tileNode.x, tileNode.y, tileNode.x, tileNode.y]
         }
         this.mapQuadTree = new QuadTree<cc.Node>(rootBounds, mapTileBoundsArr, this.mapContainer.children)

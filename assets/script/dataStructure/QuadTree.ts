@@ -40,18 +40,18 @@ class QuadTreeNode<T> {
      * 节点递归分割,当前停止分割条件以最小节点大小
      * @returns 
      */
-    public subdivide(): void {
+    public subdivide(divide: number): void {
+
         const [xmin, ymin, xmax, ymax] = this.bounds
 
         // 分割边界判断
         const width = Math.abs(xmax - xmin)
         const height = Math.abs(ymax - ymin)
-        if (width / 2 < QuadTree.minAreaSize[0] || height / 2 < QuadTree.minAreaSize[1]) return
+        const minAreaSize = [width / divide, height / divide]
+        if (width / 2 < minAreaSize[0] || height / 2 < minAreaSize[1]) return
 
         const xmid = (xmin + xmax) / 2
         const ymid = (ymin + ymax) / 2
-
-
 
         this.children.push(new QuadTreeNode<T>([xmin, ymin, xmid, ymid]))
         this.children.push(new QuadTreeNode<T>([xmid, ymin, xmax, ymid]))
@@ -59,7 +59,7 @@ class QuadTreeNode<T> {
         this.children.push(new QuadTreeNode<T>([xmid, ymid, xmax, ymax]))
 
         for (const child of this.children) {
-            child.subdivide()
+            child.subdivide(divide / 2)
         }
     }
 
@@ -103,7 +103,7 @@ class QuadTreeNode<T> {
 
 export class QuadTree<T> {
 
-    public static minAreaSize: [number, number] = [448, 512]
+    public static minAreaSize: [number, number] = [448, 256]
 
     private root: QuadTreeNode<T>
 
@@ -111,7 +111,7 @@ export class QuadTree<T> {
 
         this.root = new QuadTreeNode<T>(boundary)
 
-        this.root.subdivide()
+        this.root.subdivide(16)
 
         for (const [index, bounds] of boundsArr.entries()) {
             this.root.insert(dataArr[index], bounds)
