@@ -1,122 +1,190 @@
-class QuadTreeNode<T> {
+export class QuadTree<T extends QuadTreeObject> {
+    public bounds: QuadTreeRect
 
-    private data: T | null = null
-    private dataName: string
-    private bounds: [number, number, number, number]
-    private children: Array<QuadTreeNode<T>>
+    private level: number = 0
+    private max_levels: number = 16
+    private max_objects: number = 10
 
-    constructor(bounds: [number, number, number, number]) {
+    private objects: Array<T> = []
+    private children: Array<QuadTree<T>> = []
+
+
+    private dirStr: string = "root"
+    /**
+     * @param level 当前区域深度
+     * @param bounds 当前区域包围盒范围
+     * @param max_objects 当前区域存放的最大对象数量,超过该数量则分裂
+     * @param max_levels 整个四叉树的最大深度,超过该深度则不再分裂
+     */
+    constructor(bounds: QuadTreeRect, max_objects: number, max_levels?: number, level?: number, dirStr?: string) {
         this.bounds = bounds
-        this.children = []
+        this.dirStr = dirStr || this.dirStr
+        this.level = level || this.level
+        this.max_levels = max_levels || this.max_levels
+        this.max_objects = max_objects || this.max_objects
     }
 
     /**
-     * 插入数据
-     * @param data 数据
-     * @param bounds 数据范围
+     * 插入数据对象到当前区域中
+     * @param rect 矩形范围
+     * @param obj 区域内的对象
      */
-    public insert(data: T, bounds: [number, number, number, number]): boolean {
+    public insert(rect: QuadTreeRect, obj: T) {
 
-        // 判断地图块的坐标是否在当前节点的边界内
-        if (!this.intersects(bounds)) return false
-
-        // 若子节点为空,则直接绑定数据
-        if (this.children.length == 0) {
-            this.data = data
-            return true
+        // 如果有子节点，则插入到子节点中
+        if (this.children.length) {
+            const indexes = this.getBelongIndex(rect)
+            for (const index of indexes) {
+                this.children[index].insert(rect, obj)
+            }
+            return
         }
 
-        // 递归对子节点进行绑定数据
-        for (const child of this.children) {
-            const insertResult = child.insert(data, bounds)
-            if (insertResult) return true
-        }
 
-        return false
+        // 如果没有子节点，则插入到当前节点中
+        this.objects.push(obj)
 
-    }
+        // 插入对象后，如果对象数量超过最大数量，则分裂
+        if (this.objects.length >= this.max_objects && this.level < this.max_levels) {
 
-    /**
-     * 节点递归分割,当前停止分割条件以最小节点大小
-     * @returns 
-     */
-    public subdivide(divide: number): void {
+            if (!this.children.length) {
+                this.subdivide()
+            }
 
-        const [xmin, ymin, xmax, ymax] = this.bounds
+            // 把原有对象分散插入到新分裂子节点中
+            for (const obj of this.objects) {
+                const indexes = this.getBelongIndex(obj.owningRect)
+                for (const index of indexes) {
+                    this.children[index].insert(obj.owningRect, obj)
+                }
+            }
 
-        // 分割边界判断
-        const width = Math.abs(xmax - xmin)
-        const height = Math.abs(ymax - ymin)
-        const minAreaSize = [width / divide, height / divide]
-        if (width / 2 < minAreaSize[0] || height / 2 < minAreaSize[1]) return
-
-        const xmid = (xmin + xmax) / 2
-        const ymid = (ymin + ymax) / 2
-
-        this.children.push(new QuadTreeNode<T>([xmin, ymin, xmid, ymid]))
-        this.children.push(new QuadTreeNode<T>([xmid, ymin, xmax, ymid]))
-        this.children.push(new QuadTreeNode<T>([xmin, ymid, xmid, ymax]))
-        this.children.push(new QuadTreeNode<T>([xmid, ymid, xmax, ymax]))
-
-        for (const child of this.children) {
-            child.subdivide(divide / 2)
+            // 清空当前节点的对象
+            this.objects = []
         }
     }
 
     /**
-     * 判断节点是否与给定范围相交
-     * @param bounds 查询范围
-     * @returns 
-     */
-    public intersects(bounds: [number, number, number, number]): boolean {
-        const [xmin, ymin, xmax, ymax] = this.bounds
-        const [bxmin, bymin, bxmax, bymax] = bounds
+    * 分裂
+    */
+    public subdivide() {
+        const subWidth = this.bounds.width / 2
+        const subHeight = this.bounds.height / 2
+        // 左上
+        this.children[0] = new QuadTree({
+            x: this.bounds.x,
+            y: this.bounds.y + subHeight,
+            width: subWidth,
+            height: subHeight
+        }, this.max_objects, this.max_levels, this.level + 1, "左上")
 
-        return !(bxmax < xmin || bymax < ymin || bxmin > xmax || bymin > ymax)
+
+        // 右上
+        this.children[1] = new QuadTree({
+            x: this.bounds.x + subWidth,
+            y: this.bounds.y + subHeight,
+            width: subWidth,
+            height: subHeight
+        }, this.max_objects, this.max_levels, this.level + 1, "右上")
+
+        // 左下
+        this.children[2] = new QuadTree({
+            x: this.bounds.x,
+            y: this.bounds.y,
+            width: subWidth,
+            height: subHeight
+        }, this.max_objects, this.max_levels, this.level + 1, "坐下")
+
+        // 右下
+        this.children[3] = new QuadTree({
+            x: this.bounds.x + subWidth,
+            y: this.bounds.y,
+            width: subWidth,
+            height: subHeight
+        }, this.max_objects, this.max_levels, this.level + 1, "右下")
     }
 
     /**
-     * 查找节点范围内的节点数据
-     * @param bounds 查询范围
-     * @returns 
+     * 查询所有与矩形范围重叠内的对象 
+     * @param rect 矩形范围
      */
-    public queryIntersectsData(bounds: [number, number, number, number]): Array<T> {
-        const results: Array<T> = []
+    public retrieve(rect: QuadTreeRect): Array<T> {
 
-        if (!this.intersects(bounds)) {
-            return results;
+        let returnObjects = this.objects
+        const indexes = this.getBelongIndex(rect)
+
+        // 如果有子节点，则递归查找
+        if (this.children.length) {
+            for (const index of indexes) {
+                returnObjects = returnObjects.concat(this.children[index].retrieve(rect))
+            }
         }
 
-        if (this.data) {
-            results.push(this.data)
-        }
+        // 对象可能存在重叠，所以需要去重
+        returnObjects = returnObjects.filter((item, index) => returnObjects.indexOf(item) >= index)
 
-        for (const child of this.children) {
-            results.push(...child.queryIntersectsData(bounds))
-        }
-
-        return results
+        return returnObjects
     }
+
+    /**
+     * 获取矩形所属的节点索引
+     * @param rect 矩形范围
+     * @returns 节点索引数组
+     */
+    public getBelongIndex(rect: QuadTreeRect): Array<number> {
+        
+        // 可能同时与多个节点重叠，所以返回多个节点的索引
+        const indexes: Array<number> = []
+
+        const boundMidX = this.bounds.x + (this.bounds.width / 2)
+        const boundMidY = this.bounds.y + (this.bounds.height / 2)
+
+        const startIsInTop = rect.y >= boundMidY
+        const startIsInLeft = rect.x < boundMidX
+
+        const endIsinBottom = rect.y + rect.height <= boundMidY
+        const endIsInRight = rect.x + rect.width > boundMidX
+
+        // 左下
+        if (startIsInLeft && !startIsInTop) {
+            indexes.push(2)
+        }
+
+        // 右上
+        if (endIsInRight && !endIsinBottom) {
+            indexes.push(1)
+        }
+
+        // 左上
+        if (startIsInLeft && !endIsinBottom) {
+            indexes.push(0)
+        }
+
+        // 右下
+        if (!startIsInTop && endIsInRight) {
+            indexes.push(3)
+        }
+
+
+
+        return indexes
+    }
+
+}
+
+export type QuadTreeRect = {
+    x: number,
+    y: number,
+    width: number,
+    height: number
+}
+
+export type QuadTreeObject = {
+    owningRect: QuadTreeRect,
 }
 
 
 
-export class QuadTree<T> {
 
-    private root: QuadTreeNode<T>
 
-    constructor(boundary: [number, number, number, number], splitSize: number, boundsArr: Array<[number, number, number, number]> = [], dataArr: Array<T> = []) {
 
-        this.root = new QuadTreeNode<T>(boundary)
-
-        this.root.subdivide(splitSize)
-
-        for (const [index, bounds] of boundsArr.entries()) {
-            this.root.insert(dataArr[index], bounds)
-        }
-    }
-
-    public queryIntersectsData(bounds: [number, number, number, number]): Array<T> {
-        return this.root.queryIntersectsData(bounds)
-    }
-}

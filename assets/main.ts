@@ -1,5 +1,5 @@
 const { ccclass, property } = cc._decorator
-import { QuadTree } from './script/dataStructure/QuadTree'
+import { QuadTree, QuadTreeObject, QuadTreeRect } from './script/dataStructure/QuadTree'
 import { AStarMgr } from './script/manager/AStarMgr'
 
 @ccclass
@@ -15,8 +15,11 @@ export default class Main extends cc.Component {
     rolesContainer: cc.Node = null
 
     private isTouching: boolean = false
-    private mapQuadTree: QuadTree<cc.Node> = null
-    private mapOriSize: cc.Vec2 = cc.v2(1024 * 7, 1024 * 4)
+    private mapQuadTree: QuadTree<tileMapData> = null
+    private mapQuadSize: number = 16
+
+    private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
+    private mapTileSize: { width: number, height: number } = { width: 1024 * 7 / 16, height: 1024 * 4 / 16 }
 
     start() {
 
@@ -27,14 +30,30 @@ export default class Main extends cc.Component {
         this.viewPort.on(cc.Node.EventType.TOUCH_CANCEL, this.onViewPortTouchEnd, this)
 
         // 四叉树初始化(用于动态加载地图)
-        const rootBounds: [number, number, number, number] = [-this.mapOriSize.x / 2, -this.mapOriSize.y / 2, this.mapOriSize.x / 2, this.mapOriSize.y / 2]
-        const mapTileBoundsArr: Array<[number, number, number, number]> = new Array(this.mapContainer.children.length).fill([0, 0, 0, 0])
-        for (const [index, bounds] of mapTileBoundsArr.entries()) {
-            const tileNode = this.mapContainer.children[index]
-            mapTileBoundsArr[index] = [tileNode.x, tileNode.y, tileNode.x, tileNode.y]
-        }
-        this.mapQuadTree = new QuadTree<cc.Node>(rootBounds, 16, mapTileBoundsArr, this.mapContainer.children)
+        const rootBounds: QuadTreeRect = { x: -this.mapOriSize.width / 2, y: -this.mapOriSize.height / 2, width: this.mapOriSize.width, height: this.mapOriSize.height }
+        this.mapQuadTree = new QuadTree<tileMapData>(rootBounds, 4)
+        for (let i = 0; i < Math.pow(this.mapQuadSize, 2); i++) {
+            const rows = Math.floor(i / this.mapQuadSize)
+            const cols = i % this.mapQuadSize
+            const tilePosX = cols * this.mapTileSize.width
+            const tilePosY = (15 - rows) * this.mapTileSize.height
 
+            const tileNode = new cc.Node(`tile_${i}`)
+            tileNode.setPosition(tilePosX, tilePosY)
+            tileNode.setAnchorPoint(0, 0)
+            this.mapContainer.addChild(tileNode)
+
+            const tileBoundsX = this.mapQuadTree.bounds.x + cols * this.mapTileSize.width
+            const tileBoundsY = this.mapQuadTree.bounds.y + (this.mapQuadSize - 1 - rows) * this.mapTileSize.height
+
+            const tileRect: QuadTreeRect = { x: tileBoundsX, y: tileBoundsY, width: this.mapTileSize.width, height: this.mapTileSize.height }
+            const quadTreeObject: tileMapData = { owningRect: tileRect, node: tileNode }
+
+            this.mapQuadTree.insert(tileRect, quadTreeObject)
+
+        }
+
+        console.log('mapQuadTree', this.mapQuadTree)
         // 寻路网格初始化
         // const mapDataMatrix = new QuadTree<cc.Node>(rootBounds, 896, mapTileBoundsArr, this.mapContainer.children)
 
@@ -49,7 +68,6 @@ export default class Main extends cc.Component {
 
     private onViewPortTouchStart(event: cc.Event.EventTouch) {
         this.isTouching = true
-        // AStarMgr.findPath()
     }
 
     private onViewPortTouchMove(event: cc.Event.EventTouch) {
@@ -62,12 +80,12 @@ export default class Main extends cc.Component {
         const changePosY = this.mapContainer.y + delta.y
         const changePosX = this.mapContainer.x + delta.x
 
-        if (Math.abs(changePosX) <= this.mapOriSize.x / 2 - this.viewPort.width / 2) {
+        if (changePosX <= -this.viewPort.width / 2 && changePosX >= -this.mapOriSize.width + this.viewPort.width / 2) {
             this.mapContainer.x = changePosX
             this.rolesContainer.x = changePosX
         }
 
-        if (Math.abs(changePosY) <= this.mapOriSize.y / 2 - this.viewPort.height / 2) {
+        if (changePosY <= -this.viewPort.height / 2 && changePosY >= -this.mapOriSize.height + this.viewPort.height / 2) {
             this.mapContainer.y = changePosY
             this.rolesContainer.y = changePosY
         }
@@ -83,17 +101,24 @@ export default class Main extends cc.Component {
     private updateViewPortMapTileNodes() {
 
         // 计算 viewport 中心坐标点
-        const centerPos = new cc.Vec2(-this.mapContainer.x, -this.mapContainer.y)
+        const centerPos = new cc.Vec2(0 - (this.mapContainer.x + this.mapOriSize.width / 2), 0 - (this.mapContainer.y + this.mapOriSize.height / 2))
 
         // 判断视口与地图四叉树碰撞
-        const visiableTileNodes = this.mapQuadTree.queryIntersectsData([centerPos.x - this.viewPort.width / 2, centerPos.y - this.viewPort.height / 2, centerPos.x + this.viewPort.width / 2, centerPos.y + this.viewPort.height / 2])
+        const viewportRect: QuadTreeRect = { x: centerPos.x - this.viewPort.width / 2, y: centerPos.y - this.viewPort.height / 2, width: this.viewPort.width, height: this.viewPort.height }
+        const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(viewportRect)
 
-        for (const tileNode of this.mapContainer.children) {
-            if (visiableTileNodes.includes(tileNode)) {
-                tileNode.active = true
-            } else {
-                tileNode.active = false
+        for (const tileObject of visiableTileObjects) {
+            if (!tileObject.node.getComponent(cc.Sprite)) {
+                tileObject.node.addComponent(cc.Sprite)
+                cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
+                    tileObject.node.getComponent(cc.Sprite).spriteFrame = spriteFrame
+                })
             }
         }
     }
+}
+
+type tileMapData = {
+    owningRect: QuadTreeRect,
+    node: cc.Node
 }
