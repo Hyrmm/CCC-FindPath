@@ -216,8 +216,3 @@ export class MinHeap<T extends HeapItem> extends Heap<T>{
 }
 
 
-
-const heap = new MinHeap([{ value: 2 }, { value: 1 }, { value: 3 }])
-heap.toArray()
-
-

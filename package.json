@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@types/earcut": "^2.1.4",
+    "earcut": "^2.2.4"
+  }
+}
