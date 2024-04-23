@@ -112,22 +112,21 @@ export default class Main extends cc.Component {
 
     private initTriangleNavMeshGraph() {
 
-
         this.trianglesGraph = new GraphMatrix()
 
         // 多边形顶点(扁平、二维)
         const polygonFlatVertices = [10, 0, 0, 50, 60, 60, 70, 10]
         const polygonVertices = []
         for (let i = 0; i < polygonFlatVertices.length; i += 2) {
-            polygonVertices.push([polygonFlatVertices[i], polygonFlatVertices[i + 1]]);
+            polygonVertices.push([polygonFlatVertices[i], polygonFlatVertices[i + 1]])
         }
+
         // 多边形切割为三角形(三个顶点索引)
         const triangleVerticesIndex = earcut(polygonFlatVertices)
 
         // 构建三角形网格无向图
-        const vertexMap = new Map<string, number>() // 用于将顶点映射到三角形的索引
+        const vertexMap = new Map<string, number>()
         for (let i = 0; i < triangleVerticesIndex.length; i += 3) {
-
 
             // 构建三角形类
             const triangleVertices = triangleVerticesIndex.slice(i, i + 3)
