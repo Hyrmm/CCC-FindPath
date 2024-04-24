@@ -146,7 +146,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "maps_container_448x256(16x16)",
+    "_name": "maps_container",
     "_objFlags": 0,
     "_parent": {
       "__id__": 2
@@ -170,15 +170,15 @@
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
-      "x": 0,
-      "y": 0
+      "x": 0.5,
+      "y": 0.5
     },
     "_trs": {
       "__type__": "TypedArray",
       "ctor": "Float64Array",
       "array": [
-        -3584,
-        -2048,
+        0,
+        0,
         0,
         0,
         0,
@@ -232,15 +232,15 @@
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
-      "x": 0,
-      "y": 0
+      "x": 0.5,
+      "y": 0.5
     },
     "_trs": {
       "__type__": "TypedArray",
       "ctor": "Float64Array",
       "array": [
-        -3584,
-        -2048,
+        0,
+        0,
         0,
         0,
         0,

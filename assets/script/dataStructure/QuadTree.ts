@@ -1,3 +1,10 @@
+export enum BoundaryType {
+    LEFT_TOP,
+    RIGHT_TOP,
+    LEFT_BOTTOM,
+    RIGHT_BOTTOM
+}
+
 export class QuadTree<T extends QuadTreeObject> {
     public bounds: QuadTreeRect
 

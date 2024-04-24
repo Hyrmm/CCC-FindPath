@@ -54,12 +54,12 @@ export default class Main extends cc.Component {
             const changePosY = this.mapContainer.y + delta.y
             const changePosX = this.mapContainer.x + delta.x
 
-            if (changePosX <= -this.viewPort.width / 2 && changePosX >= -this.mapOriSize.width + this.viewPort.width / 2) {
+            if (Math.abs(changePosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
                 this.mapContainer.x = changePosX
                 this.rolesContainer.x = changePosX
             }
 
-            if (changePosY <= -this.viewPort.height / 2 && changePosY >= -this.mapOriSize.height + this.viewPort.height / 2) {
+            if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
                 this.mapContainer.y = changePosY
                 this.rolesContainer.y = changePosY
             }
@@ -104,24 +104,30 @@ export default class Main extends cc.Component {
 
         for (let i = 0; i < Math.pow(this.mapQuadSize, 2); i++) {
 
-            const rows = Math.floor(i / this.mapQuadSize)
-            const cols = i % this.mapQuadSize
-            const tilePosX = cols * this.mapTileSize.width
-            const tilePosY = (15 - rows) * this.mapTileSize.height
+            const rows = Math.floor(i / this.mapQuadSize) + 1
+            const cols = i % this.mapQuadSize + 1
 
-            const tileNode = new cc.Node(`tile_${i}`)
-            tileNode.setPosition(tilePosX, tilePosY)
-            tileNode.setAnchorPoint(0, 0)
-            this.mapContainer.addChild(tileNode)
+            // 建立基于地图节点相对地图块坐标
+            let tileNode = this.mapContainer.getChildByName(`tile_${i}`)
+            if (!tileNode) {
+                tileNode = new cc.Node(`tile_${i}`)
+                const halfTileWidth = this.mapTileSize.width / 2
+                const halfTileHeight = this.mapTileSize.height / 2
+                const tilePosX = cols <= this.mapQuadSize / 2 ? -((this.mapQuadSize / 2 - cols) * this.mapTileSize.width + halfTileWidth) : (cols - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.width + halfTileWidth
+                const tilePosY = rows <= this.mapQuadSize / 2 ? (this.mapQuadSize / 2 - rows) * this.mapTileSize.height + halfTileHeight : -((rows - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.height + halfTileHeight)
+                tileNode.setPosition(tilePosX, tilePosY)
+                tileNode.setAnchorPoint(0.5, 0.5)
+                this.mapContainer.addChild(tileNode)
+            }
 
-            const tileBoundsX = this.mapQuadTree.bounds.x + cols * this.mapTileSize.width
-            const tileBoundsY = this.mapQuadTree.bounds.y + (this.mapQuadSize - 1 - rows) * this.mapTileSize.height
-
+            // 建立基于世界坐标碰撞矩形
+            const tileBoundsX = this.mapQuadTree.bounds.x + (cols - 1) * this.mapTileSize.width
+            const tileBoundsY = this.mapQuadTree.bounds.y + (this.mapQuadSize - 1 - (rows - 1)) * this.mapTileSize.height
             const tileRect: QuadTreeRect = { x: tileBoundsX, y: tileBoundsY, width: this.mapTileSize.width, height: this.mapTileSize.height }
             const quadTreeObject: tileMapData = { owningRect: tileRect, node: tileNode }
 
+            // 绑定碰撞矩形和地图块节点插入四叉树中
             this.mapQuadTree.insert(tileRect, quadTreeObject)
-
         }
     }
 
@@ -185,22 +191,19 @@ export default class Main extends cc.Component {
     private updateViewPortMapTileNodes() {
 
         // 计算视口矩形
-        const viewportMidX = this.mapQuadTree.bounds.x + this.mapQuadTree.bounds.width / 2 / this.mapScale
-        const viewportMidY = this.mapQuadTree.bounds.y + this.mapQuadTree.bounds.height / 2 / this.mapScale
-
-        const viewportBoundX = (viewportMidX - this.viewPort.width / 2) - (this.mapContainer.x + 3584)
-        const viewportBoundY = (viewportMidY - this.viewPort.height / 2) - (this.mapContainer.y + 2048)
+        const viewportBoundX = (0 - this.viewPort.width / 2) - this.mapContainer.x
+        const viewportBoundY = (0 - this.viewPort.height / 2) - this.mapContainer.y
         const viewportRect: QuadTreeRect = { x: viewportBoundX, y: viewportBoundY, width: this.viewPort.width, height: this.viewPort.height }
 
         // 判断视口与地图四叉树碰撞
         const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(viewportRect)
         for (const tileObject of visiableTileObjects) {
-            if (!tileObject.node.getComponent(cc.Sprite)) {
-                tileObject.node.addComponent(cc.Sprite)
-                cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
-                    tileObject.node.getComponent(cc.Sprite).spriteFrame = spriteFrame
-                })
-            }
+
+            if (tileObject.node.getComponent(cc.Sprite)) continue
+
+            cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
+                tileObject.node.addComponent(cc.Sprite).spriteFrame = spriteFrame
+            })
         }
     }
 
