@@ -15,6 +15,15 @@ export default class Main extends cc.Component {
     @property(cc.Node)
     rolesContainer: cc.Node = null
 
+    @property(cc.Node)
+    btn_edit: cc.Node = null
+
+    @property(cc.Node)
+    btn_place: cc.Node = null
+
+    @property(cc.Node)
+    entity_role: cc.Node = null
+
     private isTouching: boolean = false
     private mapQuadTree: QuadTree<tileMapData> = null
     private mapQuadSize: number = 16
@@ -25,6 +34,10 @@ export default class Main extends cc.Component {
 
     private trianglesGraph: GraphMatrix = null
     private navMeshTriangles: Array<Triangle> = []
+    private polygonFlatVertices: Array<number> = []
+
+    private isEditMode: boolean = false
+    private isPlaceing: boolean = false
 
     start() {
 
@@ -70,8 +83,33 @@ export default class Main extends cc.Component {
 
         this.viewPort.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
             this.isTouching = true
+
             const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
-            this.node.getChildByName("fixed").getChildByName("pos").getComponent(cc.Label).string = `(${mapPos.x.toFixed(2)}, ${mapPos.y.toFixed(2)})`
+            mapPos.x = Math.ceil(mapPos.x)
+            mapPos.y = Math.ceil(mapPos.y)
+
+            this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${mapPos.x.toFixed(2)}, ${mapPos.y.toFixed(2)})`
+
+            // 编辑路径
+            if (this.isEditMode) {
+                if (this.polygonFlatVertices.length) {
+                    const length = this.polygonFlatVertices.length
+                    const startPos = new cc.Vec2(this.polygonFlatVertices[length - 2], this.polygonFlatVertices[length - 1])
+                    const endPos = mapPos
+                    this.drawLine(startPos, endPos)
+                }
+                this.polygonFlatVertices.push(mapPos.x, mapPos.y)
+            }
+
+            // 放置起点
+            if (this.isPlaceing) {
+                this.entity_role.x = mapPos.x
+                this.entity_role.y = mapPos.y
+                this.isPlaceing = false
+                this.btn_place.active = true
+                this.findTrianglePath(mapPos, mapPos)
+            }
+
         }, this)
 
         this.viewPort.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
@@ -82,13 +120,19 @@ export default class Main extends cc.Component {
             this.isTouching = false
         }, this)
 
-        this.viewPort.on(cc.Node.EventType.MOUSE_WHEEL, (event: cc.Event.EventMouse) => {
-            const scrollY = event.getScrollY()
-            this.mapScale = scrollY > 0 ? Number(((this.mapScale + 0.1).toFixed(1))) : Number(((this.mapScale - 0.1).toFixed(1)))
-            this.mapContainer.scale = this.mapScale
-            this.rolesContainer.scale = this.mapScale
-            this.initTileMapQuadTree()
-            this.updateViewPortMapTileNodes()
+        this.btn_edit.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
+            this.isEditMode = !this.isEditMode
+            this.btn_edit.color = this.isEditMode ? cc.Color.GREEN : cc.Color.RED
+            this.btn_edit.getChildByName("lbl").getComponent(cc.Label).string = this.isEditMode ? "edit-on" : "edit-off"
+            if (!this.isEditMode) {
+                this.rolesContainer.getComponent(cc.Graphics).clear()
+                this.initTriangleNavMeshGraph()
+            }
+        }, this)
+
+        this.btn_place.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
+            this.isPlaceing = true
+            this.btn_place.active = false
         })
     }
 
@@ -96,8 +140,8 @@ export default class Main extends cc.Component {
 
         const boundsPosX = -this.mapOriSize.width / 2
         const boundsPosY = -this.mapOriSize.height / 2
-        const boundsWidth = this.mapOriSize.width * this.mapScale
-        const boundsHeight = this.mapOriSize.height * this.mapScale
+        const boundsWidth = this.mapOriSize.width
+        const boundsHeight = this.mapOriSize.height
 
         const rootBounds: QuadTreeRect = { x: boundsPosX, y: boundsPosY, width: boundsWidth, height: boundsHeight }
         this.mapQuadTree = new QuadTree<tileMapData>(rootBounds, 4)
@@ -108,17 +152,14 @@ export default class Main extends cc.Component {
             const cols = i % this.mapQuadSize + 1
 
             // 建立基于地图节点相对地图块坐标
-            let tileNode = this.mapContainer.getChildByName(`tile_${i}`)
-            if (!tileNode) {
-                tileNode = new cc.Node(`tile_${i}`)
-                const halfTileWidth = this.mapTileSize.width / 2
-                const halfTileHeight = this.mapTileSize.height / 2
-                const tilePosX = cols <= this.mapQuadSize / 2 ? -((this.mapQuadSize / 2 - cols) * this.mapTileSize.width + halfTileWidth) : (cols - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.width + halfTileWidth
-                const tilePosY = rows <= this.mapQuadSize / 2 ? (this.mapQuadSize / 2 - rows) * this.mapTileSize.height + halfTileHeight : -((rows - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.height + halfTileHeight)
-                tileNode.setPosition(tilePosX, tilePosY)
-                tileNode.setAnchorPoint(0.5, 0.5)
-                this.mapContainer.addChild(tileNode)
-            }
+            const tileNode = new cc.Node(`tile_${i}`)
+            const halfTileWidth = this.mapTileSize.width / 2
+            const halfTileHeight = this.mapTileSize.height / 2
+            const tilePosX = cols <= this.mapQuadSize / 2 ? -((this.mapQuadSize / 2 - cols) * this.mapTileSize.width + halfTileWidth) : (cols - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.width + halfTileWidth
+            const tilePosY = rows <= this.mapQuadSize / 2 ? (this.mapQuadSize / 2 - rows) * this.mapTileSize.height + halfTileHeight : -((rows - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.height + halfTileHeight)
+            tileNode.setPosition(tilePosX, tilePosY)
+            tileNode.setAnchorPoint(0.5, 0.5)
+            this.mapContainer.addChild(tileNode)
 
             // 建立基于世界坐标碰撞矩形
             const tileBoundsX = this.mapQuadTree.bounds.x + (cols - 1) * this.mapTileSize.width
@@ -136,14 +177,13 @@ export default class Main extends cc.Component {
         this.trianglesGraph = new GraphMatrix()
 
         // 多边形顶点(扁平、二维)
-        const polygonFlatVertices = [3415, 2150, 3390, 2204, 3415, 2264, 3390, 2322, 3382, 2375, 3430, 2431, 3483, 2502, 3520, 2536, 3578, 2568, 3688, 2612, 3752, 2636, 3736, 2671, 3671, 2652, 3641, 2625, 3576, 2604, 3526, 2578, 3509, 2552, 3454, 2515, 3414, 2476, 3393, 2444, 3357, 2380, 3346, 2346, 3369, 2299, 3372, 2266, 3341, 2296, 3306, 2301, 3282, 2301, 3275, 2301, 3266, 2266, 3270, 2196, 3316, 2191, 3343, 2172, 3362, 2104]
         const polygonVertices = []
-        for (let i = 0; i < polygonFlatVertices.length; i += 2) {
-            polygonVertices.push([polygonFlatVertices[i], polygonFlatVertices[i + 1]])
+        for (let i = 0; i < this.polygonFlatVertices.length; i += 2) {
+            polygonVertices.push([this.polygonFlatVertices[i], this.polygonFlatVertices[i + 1]])
         }
 
         // 多边形切割为三角形(三个顶点索引)
-        const triangleVerticesIndex = earcut(polygonFlatVertices)
+        const triangleVerticesIndex = earcut(this.polygonFlatVertices)
 
         // 构建三角形网格无向图
         const vertexMap = new Map<string, number>()
@@ -197,8 +237,12 @@ export default class Main extends cc.Component {
 
         // 判断视口与地图四叉树碰撞
         const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(viewportRect)
-        for (const tileObject of visiableTileObjects) {
 
+        // 动态显示可视区域地图块节点
+        this.mapContainer.children.forEach((node: cc.Node) => node.active = false)
+
+        for (const tileObject of visiableTileObjects) {
+            tileObject.node.active = true
             if (tileObject.node.getComponent(cc.Sprite)) continue
 
             cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
@@ -207,8 +251,34 @@ export default class Main extends cc.Component {
         }
     }
 
+    private findTrianglePath(startPos: cc.Vec2, endPos: cc.Vec2) {
+        let startTriangleId, endTriangleId
+        for (const triangle of this.navMeshTriangles) {
+            const a = new cc.Vec2(triangle.vertices[0][0], triangle.vertices[0][1])
+            const b = new cc.Vec2(triangle.vertices[1][0], triangle.vertices[1][1])
+            const c = new cc.Vec2(triangle.vertices[2][0], triangle.vertices[2][1])
 
-    //临时代码
+            const AB_AP1 = b.sub(a).cross(startPos.sub(a))
+            const BC_BP1 = c.sub(b).cross(startPos.sub(b))
+            const CA_CP1 = a.sub(c).cross(startPos.sub(c))
+
+            const AB_AP2 = b.sub(a).cross(endPos.sub(a))
+            const BC_BP2 = c.sub(b).cross(endPos.sub(b))
+            const CA_CP2 = a.sub(c).cross(endPos.sub(c))
+
+            if (AB_AP1 > 0 && BC_BP1 > 0 && CA_CP1 > 0) {
+                this.drawTriangle(triangle, cc.Color.GREEN)
+                startTriangleId = triangle.id
+            }
+
+            if (AB_AP2 > 0 && BC_BP2 > 0 && CA_CP2 > 0) {
+                endTriangleId = triangle.id
+            }
+        }
+
+
+    }
+
     private drawLine(start: cc.Vec2, end: cc.Vec2) {
         let ctx = this.rolesContainer.getComponent(cc.Graphics)
         ctx.moveTo(start.x, start.y)
@@ -218,7 +288,7 @@ export default class Main extends cc.Component {
         ctx.stroke()
     }
 
-    private drawTriangle(triangle: Triangle) {
+    private drawTriangle(triangle: Triangle, color: cc.Color = cc.Color.RED) {
         let ctx = this.rolesContainer.getComponent(cc.Graphics)
         const vertice1 = triangle.vertices[0]
         const vertice2 = triangle.vertices[1]
@@ -228,7 +298,7 @@ export default class Main extends cc.Component {
         ctx.lineTo(vertice3[0], vertice3[1])
         ctx.lineTo(vertice1[0], vertice1[1])
         ctx.lineWidth = 5
-        ctx.strokeColor = cc.Color.RED
+        ctx.strokeColor = color
         ctx.stroke()
     }
 }
@@ -240,5 +310,5 @@ type tileMapData = {
 
 type Triangle = {
     id: number
-    vertices: [number, number, number]
+    vertices: [[number, number], [number, number], [number, number]]
 }
