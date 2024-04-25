@@ -1,6 +1,7 @@
 const { ccclass, property } = cc._decorator
 import { QuadTree, QuadTreeObject, QuadTreeRect } from './script/dataStructure/QuadTree'
 import { GraphMatrix } from './script/dataStructure/Graph'
+import { AStarGraph, Triangle } from './script/algorithm/AStarGraph'
 import earcut from "earcut"
 
 @ccclass
@@ -16,10 +17,10 @@ export default class Main extends cc.Component {
     rolesContainer: cc.Node = null
 
     @property(cc.Node)
-    btn_edit: cc.Node = null
+    pathsContainer: cc.Node = null
 
     @property(cc.Node)
-    btn_place: cc.Node = null
+    entity_end: cc.Node = null
 
     @property(cc.Node)
     entity_role: cc.Node = null
@@ -32,12 +33,9 @@ export default class Main extends cc.Component {
     private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
     private mapTileSize: { width: number, height: number } = { width: 1024 * 7 / 16, height: 1024 * 4 / 16 }
 
-    private trianglesGraph: GraphMatrix = null
-    private navMeshTriangles: Array<Triangle> = []
-    private polygonFlatVertices: Array<number> = []
 
-    private isEditMode: boolean = false
-    private isPlaceing: boolean = false
+    private astarGraph: AStarGraph = null
+
 
     start() {
 
@@ -58,6 +56,12 @@ export default class Main extends cc.Component {
 
 
     private initTouchEventListener() {
+        const tempV = []
+
+        let isPlacingEnd = false
+        let isPlacingRole = false
+
+
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
             if (!this.isTouching) return
 
@@ -84,31 +88,20 @@ export default class Main extends cc.Component {
         this.viewPort.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
             this.isTouching = true
 
+
             const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
             mapPos.x = Math.ceil(mapPos.x)
             mapPos.y = Math.ceil(mapPos.y)
 
             this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${mapPos.x.toFixed(2)}, ${mapPos.y.toFixed(2)})`
 
-            // 编辑路径
-            if (this.isEditMode) {
-                if (this.polygonFlatVertices.length) {
-                    const length = this.polygonFlatVertices.length
-                    const startPos = new cc.Vec2(this.polygonFlatVertices[length - 2], this.polygonFlatVertices[length - 1])
-                    const endPos = mapPos
-                    this.drawLine(startPos, endPos)
-                }
-                this.polygonFlatVertices.push(mapPos.x, mapPos.y)
-            }
+            tempV.push(mapPos.x, mapPos.y)
 
-            // 放置起点
-            if (this.isPlaceing) {
-                this.entity_role.x = mapPos.x
-                this.entity_role.y = mapPos.y
-                this.isPlaceing = false
-                this.btn_place.active = true
-                this.findTrianglePath(mapPos, mapPos)
-            }
+            if (isPlacingEnd) isPlacingEnd = false
+            if (isPlacingRole) isPlacingRole = false
+
+            console.log(this.astarGraph.getTriangleIdByPos(mapPos))
+
 
         }, this)
 
@@ -120,20 +113,39 @@ export default class Main extends cc.Component {
             this.isTouching = false
         }, this)
 
-        this.btn_edit.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
-            this.isEditMode = !this.isEditMode
-            this.btn_edit.color = this.isEditMode ? cc.Color.GREEN : cc.Color.RED
-            this.btn_edit.getChildByName("lbl").getComponent(cc.Label).string = this.isEditMode ? "edit-on" : "edit-off"
-            if (!this.isEditMode) {
-                this.rolesContainer.getComponent(cc.Graphics).clear()
-                this.initTriangleNavMeshGraph()
-            }
-        }, this)
+        this.viewPort.on(cc.Node.EventType.MOUSE_MOVE, (event: cc.Event.EventMouse) => {
+            const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
 
-        this.btn_place.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
-            this.isPlaceing = true
-            this.btn_place.active = false
+            if (isPlacingEnd) {
+                this.entity_end.x = Math.ceil(mapPos.x)
+                this.entity_end.y = Math.ceil(mapPos.y)
+            }
+
+            if (isPlacingRole) {
+                this.entity_role.x = Math.ceil(mapPos.x)
+                this.entity_role.y = Math.ceil(mapPos.y)
+            }
+
         })
+
+        this.entity_end.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
+            if (isPlacingEnd) {
+                const start = new cc.Vec2(this.entity_role.x, this.entity_role.y)
+                const end = new cc.Vec2(this.entity_end.x, this.entity_end.y)
+                this.pathsContainer.getComponent(cc.Graphics).clear()
+                for (const triangle of this.astarGraph.findTrianglePath(start, end)) {
+                    this.drawTriangle(this.pathsContainer.getComponent(cc.Graphics), triangle, cc.Color.GREEN)
+                }
+            }
+            isPlacingEnd = !isPlacingEnd
+        })
+
+        this.entity_role.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
+            isPlacingRole = !isPlacingRole
+        })
+
+
+
     }
 
     private initTileMapQuadTree() {
@@ -173,20 +185,21 @@ export default class Main extends cc.Component {
     }
 
     private initTriangleNavMeshGraph() {
-
-        this.trianglesGraph = new GraphMatrix()
-
         // 多边形顶点(扁平、二维)
+        const polygonVerticesFlat = [-94, 474, 218, 457, 239, 203, 76, 66, -87, 76, -193, -94, -283, 261, -209, 594]
+
         const polygonVertices = []
-        for (let i = 0; i < this.polygonFlatVertices.length; i += 2) {
-            polygonVertices.push([this.polygonFlatVertices[i], this.polygonFlatVertices[i + 1]])
+        for (let i = 0; i < polygonVerticesFlat.length; i += 2) {
+            polygonVertices.push([polygonVerticesFlat[i], polygonVerticesFlat[i + 1]])
         }
 
         // 多边形切割为三角形(三个顶点索引)
-        const triangleVerticesIndex = earcut(this.polygonFlatVertices)
+        const triangleVerticesIndex = earcut(polygonVerticesFlat)
 
         // 构建三角形网格无向图
-        const vertexMap = new Map<string, number>()
+        const triangles: Triangle[] = []
+        const trianglesGraph = new GraphMatrix()
+        const vertexCache = new Map<string, Array<Triangle>>()
         for (let i = 0; i < triangleVerticesIndex.length; i += 3) {
 
             // 构建三角形类:给图中添加顶点
@@ -194,37 +207,49 @@ export default class Main extends cc.Component {
             const vertice1 = polygonVertices[triangleVertices[0]]
             const vertice2 = polygonVertices[triangleVertices[1]]
             const vertice3 = polygonVertices[triangleVertices[2]]
-            const triangle: Triangle = { id: Math.ceil(i / 3), vertices: [vertice1, vertice2, vertice3] }
-            this.navMeshTriangles.push(triangle)
-            this.trianglesGraph.addVertex(triangle.id)
-            this.drawTriangle(triangle)
+
+            const triangle: Triangle = { id: Math.floor(i / 3), vertices: [new cc.Vec2(vertice1[0], vertice1[1]), new cc.Vec2(vertice2[0], vertice2[1]), new cc.Vec2(vertice3[0], vertice3[1])] }
+            triangles.push(triangle)
+            trianglesGraph.addVertex(triangle.id)
 
             // 构建三角形类:给图中添加顶点
             for (const vertice of triangle.vertices) {
 
-                const key = `${vertice[0]},${vertice[1]}`
+                const key = `${vertice.x},${vertice.y}`
 
-                if (!vertexMap.has(key)) {
+                if (!vertexCache.has(key)) {
+                    vertexCache.set(key, [triangle])
+                    continue
+                }
 
-                    vertexMap.set(key, triangle.id)
+                // 通过判断俩三角形是否存在邻接边,来构建图中邻接边
+                const neighborTriangles = vertexCache.get(key)
 
-                } else {
-
-                    // 通过判断俩三角形是否存在邻接边,来构建图中邻接边
-                    const neighborTriangleId = vertexMap.get(key)
-                    const neighborTriangle = this.navMeshTriangles[neighborTriangleId]
-                    const vertices1 = triangle.vertices.filter(v => v[0] !== vertice[0] || v[1] !== vertice[1])
-                    const vertices2 = neighborTriangle.vertices.filter(v => v[0] !== vertice[0] || v[1] !== vertice[1])
+                for (const neighborTriangle of neighborTriangles) {
+                    const vertices1 = triangle.vertices.filter(v => v.x !== vertice.x || v.y !== vertice.y)
+                    const vertices2 = neighborTriangle.vertices.filter(v => v.x !== vertice.x || v.y !== vertice.y)
 
                     for (const vertex of vertices1) {
-                        if ((vertices2[0][0] == vertex[0] && vertices2[0][1] == vertex[1]) || (vertices2[1][0] == vertex[0] && vertices2[1][1] == vertex[1])) {
-                            this.trianglesGraph.addEdge(triangle.id, neighborTriangleId)
+
+                        if ((vertices2[0].x == vertex.x && vertices2[0].y == vertex.y) || (vertices2[1].x == vertex.x && vertices2[1].y == vertex.y)) {
+                            trianglesGraph.addEdge(triangle.id, neighborTriangle.id)
                             break
                         }
+
                     }
                 }
 
+                vertexCache.get(key).push(triangle)
+
+
             }
+
+
+        }
+        this.astarGraph = new AStarGraph(trianglesGraph, triangles)
+
+        for (const triangle of triangles) {
+            this.drawTriangle(this.rolesContainer.getComponent(cc.Graphics), triangle)
         }
     }
 
@@ -251,34 +276,6 @@ export default class Main extends cc.Component {
         }
     }
 
-    private findTrianglePath(startPos: cc.Vec2, endPos: cc.Vec2) {
-        let startTriangleId, endTriangleId
-        for (const triangle of this.navMeshTriangles) {
-            const a = new cc.Vec2(triangle.vertices[0][0], triangle.vertices[0][1])
-            const b = new cc.Vec2(triangle.vertices[1][0], triangle.vertices[1][1])
-            const c = new cc.Vec2(triangle.vertices[2][0], triangle.vertices[2][1])
-
-            const AB_AP1 = b.sub(a).cross(startPos.sub(a))
-            const BC_BP1 = c.sub(b).cross(startPos.sub(b))
-            const CA_CP1 = a.sub(c).cross(startPos.sub(c))
-
-            const AB_AP2 = b.sub(a).cross(endPos.sub(a))
-            const BC_BP2 = c.sub(b).cross(endPos.sub(b))
-            const CA_CP2 = a.sub(c).cross(endPos.sub(c))
-
-            if (AB_AP1 > 0 && BC_BP1 > 0 && CA_CP1 > 0) {
-                this.drawTriangle(triangle, cc.Color.GREEN)
-                startTriangleId = triangle.id
-            }
-
-            if (AB_AP2 > 0 && BC_BP2 > 0 && CA_CP2 > 0) {
-                endTriangleId = triangle.id
-            }
-        }
-
-
-    }
-
     private drawLine(start: cc.Vec2, end: cc.Vec2) {
         let ctx = this.rolesContainer.getComponent(cc.Graphics)
         ctx.moveTo(start.x, start.y)
@@ -288,15 +285,14 @@ export default class Main extends cc.Component {
         ctx.stroke()
     }
 
-    private drawTriangle(triangle: Triangle, color: cc.Color = cc.Color.RED) {
-        let ctx = this.rolesContainer.getComponent(cc.Graphics)
+    private drawTriangle(ctx: cc.Graphics, triangle: Triangle, color: cc.Color = cc.Color.RED) {
         const vertice1 = triangle.vertices[0]
         const vertice2 = triangle.vertices[1]
         const vertice3 = triangle.vertices[2]
-        ctx.moveTo(vertice1[0], vertice1[1])
-        ctx.lineTo(vertice2[0], vertice2[1])
-        ctx.lineTo(vertice3[0], vertice3[1])
-        ctx.lineTo(vertice1[0], vertice1[1])
+        ctx.moveTo(vertice1.x, vertice1.y)
+        ctx.lineTo(vertice2.x, vertice2.y)
+        ctx.lineTo(vertice3.x, vertice3.y)
+        ctx.lineTo(vertice1.x, vertice1.y)
         ctx.lineWidth = 5
         ctx.strokeColor = color
         ctx.stroke()
@@ -308,7 +304,3 @@ type tileMapData = {
     node: cc.Node
 }
 
-type Triangle = {
-    id: number
-    vertices: [[number, number], [number, number], [number, number]]
-}
