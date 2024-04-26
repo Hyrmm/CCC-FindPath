@@ -29,7 +29,6 @@ export default class Main extends cc.Component {
     private mapQuadTree: QuadTree<tileMapData> = null
     private mapQuadSize: number = 16
 
-    private mapScale: number = 1
     private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
     private mapTileSize: { width: number, height: number } = { width: 1024 * 7 / 16, height: 1024 * 4 / 16 }
 
@@ -38,15 +37,20 @@ export default class Main extends cc.Component {
 
 
     start() {
-
+        console.time("init")
         // 地图触摸相关事件监听
         this.initTouchEventListener()
+        console.timeEnd("init")
 
+        console.time("QuadTree")
         // 四叉树初始化(用于动态加载可视区域显示地图)
         this.initTileMapQuadTree()
+        console.timeEnd("QuadTree")
 
+        console.time("meshGraph")
         // 寻路网格初始化(用于寻路算法)
         this.initTriangleNavMeshGraph()
+        console.timeEnd("meshGraph")
 
         // 首次地图可视范围更新
         this.updateViewPortMapTileNodes()

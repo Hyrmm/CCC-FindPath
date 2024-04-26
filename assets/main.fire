@@ -1223,6 +1223,9 @@
     "rolesContainer": {
       "__id__": 6
     },
+    "pathsContainer": {
+      "__id__": 16
+    },
     "entity_end": {
       "__id__": 11
     },
