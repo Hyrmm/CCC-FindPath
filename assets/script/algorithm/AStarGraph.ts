@@ -1,8 +1,8 @@
 /*
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:56 
- * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-04-27 17:10:56 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-04-28 00:16:45
  */
 
 
@@ -22,7 +22,7 @@ export type Triangle = {
 
 
 export class AStarGraph {
-    
+
     private graph: GraphMatrix<[cc.Vec2, cc.Vec2]>
     private triangles: Array<Triangle>
 
@@ -77,7 +77,7 @@ export class AStarGraph {
         return this.triangles
     }
 
-    public findTrianglePath(start: cc.Vec2, end: cc.Vec2): { trianglesPath: Array<Triangle>, pointsPath: Array<cc.Vec2> } {
+    public findTrianglePath(start: cc.Vec2, end: cc.Vec2, progressCallback?: Function): { trianglesPath: Array<Triangle>, pointsPath: Array<cc.Vec2> } {
 
         const startTriangleId = this.getTriangleIdByPos(start)
         const endTriangleId = this.getTriangleIdByPos(end)
@@ -141,6 +141,42 @@ export class AStarGraph {
                     if (edge) pointsPath.push(getMidpoint(edge[0], edge[1]))
 
                 }
+
+                // 漏斗算法(拉绳子)
+                let apex = start
+                let left, right
+                for (const [index, triangle] of trianglesPath.entries()) {
+                    if (index + 1 === trianglesPath.length) break
+                    const edge = this.graph.getEdge(triangle.id, trianglesPath[index + 1].id)
+
+                    // 首次确定左右点,采用和中线叉积任意顶点
+                    if (!left || !right) {
+                        const apexMidVec = getMidpoint(edge[0], edge[1]).sub(apex)
+                        const aVec = edge[0].sub(apex)
+                        if (apexMidVec.cross(aVec) > 0) {
+                            left = edge[0]
+                            right = edge[1]
+                        } else {
+                            left = edge[1]
+                            right = edge[0]
+                        }
+                        continue
+                    }
+
+
+
+                    if (edge.includes(left)) {
+                        right = edge[edge.indexOf(right)]
+                    }
+
+                    if (edge.includes(right)) {
+                        left = edge[edge.indexOf(left)]
+                    }
+
+                    // 计算漏斗大小是否变大，如果变大，则更新apex点
+
+                }
+
 
 
                 return { trianglesPath: trianglesPath.reverse(), pointsPath }

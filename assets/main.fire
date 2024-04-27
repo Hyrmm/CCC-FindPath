@@ -750,37 +750,20 @@
     "_id": "25JWfc885IwZdnSMKmQ+5/"
   },
   {
-    "__type__": "cc.Graphics",
+    "__type__": "ffd91cGKoNBvrly5ZLYa6T7",
     "_name": "",
     "_objFlags": 0,
     "node": {
       "__id__": 6
     },
     "_enabled": true,
-    "_materials": [
-      {
-        "__uuid__": "a153945d-2511-4c14-be7b-05d242f47d57"
-      }
-    ],
-    "_lineWidth": 2,
-    "_strokeColor": {
-      "__type__": "cc.Color",
-      "r": 0,
-      "g": 0,
-      "b": 0,
-      "a": 255
+    "entity_start": {
+      "__id__": 7
     },
-    "_lineJoin": 2,
-    "_lineCap": 0,
-    "_fillColor": {
-      "__type__": "cc.Color",
-      "r": 244,
-      "g": 10,
-      "b": 71,
-      "a": 255
+    "entity_end": {
+      "__id__": 11
     },
-    "_miterLimit": 10,
-    "_id": "f3fOSKNdtBerbDcB1Sb0Nc"
+    "_id": "0fesVREDRM1oovYJ72gp6H"
   },
   {
     "__type__": "cc.Node",
