@@ -1,8 +1,8 @@
 /*
  * @Author: hyrm 
- * @Date: 2024-04-27 16:25:51 
- * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-04-27 16:25:51 
+ * @Date: 2024-04-16 16:25:03 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-04-27 16:28:50
  */
 const { ccclass, property } = cc._decorator
 import { QuadTree, QuadTreeObject, QuadTreeRect } from './script/dataStructure/QuadTree'
@@ -195,7 +195,12 @@ export default class Main extends cc.Component {
     private initTriangleNavMeshGraph() {
         const polygonVerticesFlat = [-94, 474, 218, 457, 239, 203, 76, 66, -87, 76, -193, -94, -283, 261, -209, 594]
         const triangleVerticesIndexs = earcut(polygonVerticesFlat)
+
         this.astarGraph = new AStarGraph(flatVertexs2Vec2(polygonVerticesFlat), triangleVerticesIndexs)
+        for (const triangle of this.astarGraph.trianglesMesh) {
+            this.drawTriangle(this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics), triangle)
+        }
+
     }
 
     private updateViewPortMapTileNodes() {

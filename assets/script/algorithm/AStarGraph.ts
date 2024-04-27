@@ -1,8 +1,8 @@
 /*
  * @Author: hyrm 
- * @Date: 2024-04-27 16:25:03 
- * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-04-27 16:25:03 
+ * @Date: 2024-04-16 16:25:03 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-04-27 16:28:26
  */
 
 import { GraphMatrix } from "../dataStructure/Graph"
@@ -20,9 +20,8 @@ export type Triangle = {
 
 
 
-
 export class AStarGraph {
-
+    
     private graph: GraphMatrix<[cc.Vec2, cc.Vec2]>
     private triangles: Array<Triangle>
 
@@ -69,9 +68,13 @@ export class AStarGraph {
         }
 
         this.graph = trianglesGraph
+        this.triangles = triangles
 
     }
 
+    public get trianglesMesh(): Array<Triangle> {
+        return this.triangles
+    }
 
     public findTrianglePath(start: cc.Vec2, end: cc.Vec2): { trianglesPath: Array<Triangle>, pointsPath: Array<cc.Vec2> } {
 
@@ -113,7 +116,7 @@ export class AStarGraph {
             // 开启列表排序
             this.openList.sort((a, b) => a.f - b.f)
 
-            // 开启下一轮领边三角形搜索
+            // 开启下一轮邻域搜索
             const nextTriangle = this.openList.shift()
             currentTriangleId = nextTriangle.id
             this.closeList.push(nextTriangle)
@@ -141,7 +144,6 @@ export class AStarGraph {
 
                 return { trianglesPath: trianglesPath.reverse(), pointsPath }
             }
-
         }
     }
 

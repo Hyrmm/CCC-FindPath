@@ -1,8 +1,8 @@
 /*
  * @Author: hyrm 
- * @Date: 2024-04-27 16:25:24 
- * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-04-27 16:25:24 
+ * @Date: 2024-04-16 16:25:03 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-04-27 16:28:34
  */
 
 // 基于邻接举证实现
@@ -11,7 +11,7 @@ export class GraphMatrix<T> {
     private matrix: Array<T[]> = []
     private vertices: Array<number> = []
 
-    /* 构造函数 */
+    /* 构造函数 */a
     constructor(vertices: number[] = [], edges: Array<T> = []) {
 
         // 添加顶点
