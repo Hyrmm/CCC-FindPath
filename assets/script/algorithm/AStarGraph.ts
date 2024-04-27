@@ -1,4 +1,12 @@
+/*
+ * @Author: hyrm 
+ * @Date: 2024-04-27 16:25:03 
+ * @Last Modified by:   hyrm 
+ * @Last Modified time: 2024-04-27 16:25:03 
+ */
+
 import { GraphMatrix } from "../dataStructure/Graph"
+import { flatVertexs2Vec2, getCommonVertexs, getMidpoint } from "../utils/Utils"
 
 export type Triangle = {
     id: number
@@ -8,7 +16,6 @@ export type Triangle = {
     g?: number
     h?: number
     parent?: Triangle
-
 }
 
 
@@ -16,19 +23,57 @@ export type Triangle = {
 
 export class AStarGraph {
 
-    private graph: GraphMatrix
+    private graph: GraphMatrix<[cc.Vec2, cc.Vec2]>
     private triangles: Array<Triangle>
 
     private openList: Array<Triangle> = []
     private closeList: Array<Triangle> = []
 
-    constructor(graph: GraphMatrix, triangles: Array<Triangle>) {
-        this.graph = graph
-        this.triangles = triangles
+    constructor(vertices: Array<cc.Vec2>, triangleIndex: Array<number>) {
+
+        // 构建三角形网格无向图
+        const vertexCache = new Map<string, Array<Triangle>>()
+        const triangles: Triangle[] = []
+        const trianglesGraph = new GraphMatrix<[cc.Vec2, cc.Vec2]>()
+
+        for (let i = 0; i < triangleIndex.length; i += 3) {
+            const curTriangleIndex = triangleIndex.slice(i, i + 3)
+            const vertice1 = vertices[curTriangleIndex[0]]
+            const vertice2 = vertices[curTriangleIndex[1]]
+            const vertice3 = vertices[curTriangleIndex[2]]
+            const triangle: Triangle = { id: Math.floor(i / 3), vertices: [vertice1, vertice2, vertice3] }
+
+            triangles.push(triangle)
+            trianglesGraph.addVertex(triangle.id)
+
+            for (const vertice of triangle.vertices) {
+                const key = `${vertice.x},${vertice.y}`
+                if (!vertexCache.has(key)) {
+
+                    vertexCache.set(key, [triangle])
+
+                } else {
+
+                    const neighborTriangles = vertexCache.get(key)
+                    for (const neighborTriangle of neighborTriangles) {
+                        const commonVertexs = getCommonVertexs(triangle.vertices, neighborTriangle.vertices)
+                        if (commonVertexs.length === 2) trianglesGraph.addEdge(triangle.id, neighborTriangle.id, [commonVertexs[0], commonVertexs[1]])
+                    }
+
+                    vertexCache.get(key).push(triangle)
+                }
+
+            }
+
+
+        }
+
+        this.graph = trianglesGraph
+
     }
 
 
-    public findTrianglePath(start: cc.Vec2, end: cc.Vec2): Array<Triangle> {
+    public findTrianglePath(start: cc.Vec2, end: cc.Vec2): { trianglesPath: Array<Triangle>, pointsPath: Array<cc.Vec2> } {
 
         const startTriangleId = this.getTriangleIdByPos(start)
         const endTriangleId = this.getTriangleIdByPos(end)
@@ -75,13 +120,26 @@ export class AStarGraph {
 
             // 找到终点三角形，结束搜索，回溯返回路径
             if (currentTriangleId === endTriangleId) {
-                const path: Array<Triangle> = []
-                let current = this.triangles[endTriangleId]
-                while (current) {
-                    path.push(current)
-                    current = current.parent
+                let pointsPath: Array<cc.Vec2> = []
+                let trianglesPath: Array<Triangle> = []
+                let currentTriangle = this.triangles[endTriangleId]
+
+                while (currentTriangle) {
+                    trianglesPath.push(currentTriangle)
+                    currentTriangle = currentTriangle.parent
                 }
-                return path.reverse()
+                trianglesPath = trianglesPath.reverse()
+
+                for (const [index, triangle] of trianglesPath.entries()) {
+                    if (index + 1 === trianglesPath.length) break
+
+                    const edge = this.graph.getEdge(triangle.id, trianglesPath[index + 1].id)
+                    if (edge) pointsPath.push(getMidpoint(edge[0], edge[1]))
+
+                }
+
+
+                return { trianglesPath: trianglesPath.reverse(), pointsPath }
             }
 
         }

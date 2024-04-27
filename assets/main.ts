@@ -1,9 +1,15 @@
+/*
+ * @Author: hyrm 
+ * @Date: 2024-04-27 16:25:51 
+ * @Last Modified by:   hyrm 
+ * @Last Modified time: 2024-04-27 16:25:51 
+ */
 const { ccclass, property } = cc._decorator
 import { QuadTree, QuadTreeObject, QuadTreeRect } from './script/dataStructure/QuadTree'
 import { GraphMatrix } from './script/dataStructure/Graph'
 import { AStarGraph, Triangle } from './script/algorithm/AStarGraph'
 import earcut from "earcut"
-
+import { flatVertexs2Vec2, getCommonVertexs } from './script/utils/Utils'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -14,16 +20,17 @@ export default class Main extends cc.Component {
     mapContainer: cc.Node = null
 
     @property(cc.Node)
-    rolesContainer: cc.Node = null
+    entityContainer: cc.Node = null
 
     @property(cc.Node)
-    pathsContainer: cc.Node = null
+    graphicsContainer: cc.Node = null
+
+    @property(cc.Node)
+    entity_start: cc.Node = null
 
     @property(cc.Node)
     entity_end: cc.Node = null
 
-    @property(cc.Node)
-    entity_role: cc.Node = null
 
     private isTouching: boolean = false
     private mapQuadTree: QuadTree<tileMapData> = null
@@ -60,11 +67,8 @@ export default class Main extends cc.Component {
 
 
     private initTouchEventListener() {
-        const tempV = []
-
         let isPlacingEnd = false
         let isPlacingRole = false
-
 
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
             if (!this.isTouching) return
@@ -77,12 +81,14 @@ export default class Main extends cc.Component {
 
             if (Math.abs(changePosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
                 this.mapContainer.x = changePosX
-                this.rolesContainer.x = changePosX
+                this.entityContainer.x = changePosX
+                this.graphicsContainer.x = changePosX
             }
 
             if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
                 this.mapContainer.y = changePosY
-                this.rolesContainer.y = changePosY
+                this.entityContainer.y = changePosY
+                this.graphicsContainer.y = changePosY
             }
 
             this.updateViewPortMapTileNodes()
@@ -92,20 +98,13 @@ export default class Main extends cc.Component {
         this.viewPort.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
             this.isTouching = true
 
-
             const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
             mapPos.x = Math.ceil(mapPos.x)
             mapPos.y = Math.ceil(mapPos.y)
-
-            this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${mapPos.x.toFixed(2)}, ${mapPos.y.toFixed(2)})`
-
-            tempV.push(mapPos.x, mapPos.y)
+            this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${mapPos.x.toFixed(2)}, ${mapPos.y.toFixed(2)})\n(triangle:${this.astarGraph.getTriangleIdByPos(mapPos)})`
 
             if (isPlacingEnd) isPlacingEnd = false
             if (isPlacingRole) isPlacingRole = false
-
-            console.log(this.astarGraph.getTriangleIdByPos(mapPos))
-
 
         }, this)
 
@@ -126,29 +125,34 @@ export default class Main extends cc.Component {
             }
 
             if (isPlacingRole) {
-                this.entity_role.x = Math.ceil(mapPos.x)
-                this.entity_role.y = Math.ceil(mapPos.y)
+                this.entity_start.x = Math.ceil(mapPos.x)
+                this.entity_start.y = Math.ceil(mapPos.y)
             }
 
         })
 
         this.entity_end.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
             if (isPlacingEnd) {
-                const start = new cc.Vec2(this.entity_role.x, this.entity_role.y)
+                const start = new cc.Vec2(this.entity_start.x, this.entity_start.y)
                 const end = new cc.Vec2(this.entity_end.x, this.entity_end.y)
-                this.pathsContainer.getComponent(cc.Graphics).clear()
-                for (const triangle of this.astarGraph.findTrianglePath(start, end)) {
-                    this.drawTriangle(this.pathsContainer.getComponent(cc.Graphics), triangle, cc.Color.GREEN)
+
+                const pathGraphics = this.graphicsContainer.getChildByName("path_graphics").getComponent(cc.Graphics)
+                pathGraphics.clear()
+
+                const path = this.astarGraph.findTrianglePath(start, end)
+                for (const triangle of path.trianglesPath) {
+                    this.drawTriangle(pathGraphics, triangle, cc.Color.GREEN)
                 }
+                path.pointsPath.unshift(start)
+                path.pointsPath.push(end)
+                this.drawLine(pathGraphics, path.pointsPath)
             }
             isPlacingEnd = !isPlacingEnd
         })
 
-        this.entity_role.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
+        this.entity_start.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
             isPlacingRole = !isPlacingRole
         })
-
-
 
     }
 
@@ -189,72 +193,9 @@ export default class Main extends cc.Component {
     }
 
     private initTriangleNavMeshGraph() {
-        // 多边形顶点(扁平、二维)
         const polygonVerticesFlat = [-94, 474, 218, 457, 239, 203, 76, 66, -87, 76, -193, -94, -283, 261, -209, 594]
-
-        const polygonVertices = []
-        for (let i = 0; i < polygonVerticesFlat.length; i += 2) {
-            polygonVertices.push([polygonVerticesFlat[i], polygonVerticesFlat[i + 1]])
-        }
-
-        // 多边形切割为三角形(三个顶点索引)
-        const triangleVerticesIndex = earcut(polygonVerticesFlat)
-
-        // 构建三角形网格无向图
-        const triangles: Triangle[] = []
-        const trianglesGraph = new GraphMatrix()
-        const vertexCache = new Map<string, Array<Triangle>>()
-        for (let i = 0; i < triangleVerticesIndex.length; i += 3) {
-
-            // 构建三角形类:给图中添加顶点
-            const triangleVertices = triangleVerticesIndex.slice(i, i + 3)
-            const vertice1 = polygonVertices[triangleVertices[0]]
-            const vertice2 = polygonVertices[triangleVertices[1]]
-            const vertice3 = polygonVertices[triangleVertices[2]]
-
-            const triangle: Triangle = { id: Math.floor(i / 3), vertices: [new cc.Vec2(vertice1[0], vertice1[1]), new cc.Vec2(vertice2[0], vertice2[1]), new cc.Vec2(vertice3[0], vertice3[1])] }
-            triangles.push(triangle)
-            trianglesGraph.addVertex(triangle.id)
-
-            // 构建三角形类:给图中添加顶点
-            for (const vertice of triangle.vertices) {
-
-                const key = `${vertice.x},${vertice.y}`
-
-                if (!vertexCache.has(key)) {
-                    vertexCache.set(key, [triangle])
-                    continue
-                }
-
-                // 通过判断俩三角形是否存在邻接边,来构建图中邻接边
-                const neighborTriangles = vertexCache.get(key)
-
-                for (const neighborTriangle of neighborTriangles) {
-                    const vertices1 = triangle.vertices.filter(v => v.x !== vertice.x || v.y !== vertice.y)
-                    const vertices2 = neighborTriangle.vertices.filter(v => v.x !== vertice.x || v.y !== vertice.y)
-
-                    for (const vertex of vertices1) {
-
-                        if ((vertices2[0].x == vertex.x && vertices2[0].y == vertex.y) || (vertices2[1].x == vertex.x && vertices2[1].y == vertex.y)) {
-                            trianglesGraph.addEdge(triangle.id, neighborTriangle.id)
-                            break
-                        }
-
-                    }
-                }
-
-                vertexCache.get(key).push(triangle)
-
-
-            }
-
-
-        }
-        this.astarGraph = new AStarGraph(trianglesGraph, triangles)
-
-        for (const triangle of triangles) {
-            this.drawTriangle(this.rolesContainer.getComponent(cc.Graphics), triangle)
-        }
+        const triangleVerticesIndexs = earcut(polygonVerticesFlat)
+        this.astarGraph = new AStarGraph(flatVertexs2Vec2(polygonVerticesFlat), triangleVerticesIndexs)
     }
 
     private updateViewPortMapTileNodes() {
@@ -280,12 +221,14 @@ export default class Main extends cc.Component {
         }
     }
 
-    private drawLine(start: cc.Vec2, end: cc.Vec2) {
-        let ctx = this.rolesContainer.getComponent(cc.Graphics)
-        ctx.moveTo(start.x, start.y)
-        ctx.lineTo(end.x, end.y)
+    private drawLine(ctx: cc.Graphics, points: Array<cc.Vec2>) {
+
+        ctx.moveTo(points[0].x, points[0].y)
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y)
+        }
         ctx.lineWidth = 5
-        ctx.strokeColor = cc.Color.RED
+        ctx.strokeColor = cc.Color.BLACK
         ctx.stroke()
     }
 

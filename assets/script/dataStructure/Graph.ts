@@ -1,12 +1,18 @@
+/*
+ * @Author: hyrm 
+ * @Date: 2024-04-27 16:25:24 
+ * @Last Modified by:   hyrm 
+ * @Last Modified time: 2024-04-27 16:25:24 
+ */
 
 // 基于邻接举证实现
-export class GraphMatrix {
+export class GraphMatrix<T> {
 
-    private matrix: Array<number[]> = []
+    private matrix: Array<T[]> = []
     private vertices: Array<number> = []
 
     /* 构造函数 */
-    constructor(vertices: number[] = [], edges: Array<number[]> = []) {
+    constructor(vertices: number[] = [], edges: Array<T> = []) {
 
         // 添加顶点
         for (const val of vertices) {
@@ -30,15 +36,15 @@ export class GraphMatrix {
         this.vertices.push(val)
 
         // 在邻接矩阵中添加一行
-        const newRow: number[] = []
+        const newRow: T[] = []
         for (let j = 0; j < size; j++) {
-            newRow.push(0)
+            newRow.push(null)
         }
         this.matrix.push(newRow)
 
         // 在邻接矩阵中添加一列
         for (const row of this.matrix) {
-            row.push(0)
+            row.push(null)
         }
     }
 
@@ -67,14 +73,14 @@ export class GraphMatrix {
      * @param j 
      * @param weight 
      */
-    public addEdge(i: number, j: number, weight: number = 1): void {
+    public addEdge(i: number, j: number, edge: T = null): void {
         // 索引越界与相等处理
         if (i < 0 || j < 0 || i >= this.size() || j >= this.size() || i === j) {
             throw new RangeError('Index Out Of Bounds Exception')
         }
         // 在无向图中，邻接矩阵关于主对角线对称，即满足 (i, j) === (j, i)
-        this.matrix[i][j] = weight
-        this.matrix[j][i] = weight
+        this.matrix[i][j] = edge
+        this.matrix[j][i] = edge
     }
 
     /**
@@ -85,10 +91,24 @@ export class GraphMatrix {
     public removeEdge(i: number, j: number): void {
         // 索引越界与相等处理
         if (i < 0 || j < 0 || i >= this.size() || j >= this.size() || i === j) {
-            throw new RangeError('Index Out Of Bounds Exception')
+            throw new Error('索引越界或相等')
         }
-        this.matrix[i][j] = 0
-        this.matrix[j][i] = 0
+        this.matrix[i][j] = null
+        this.matrix[j][i] = null
+    }
+
+    /**
+     * 获取边
+     * @param i 
+     * @param j 
+     */
+
+    public getEdge(i: number, j: number): T {
+        // 索引越界与相等处理
+        if (i < 0 || j < 0 || i >= this.size() || j >= this.size() || i === j) {
+            throw new Error('索引越界或相等')
+        }
+        return this.matrix[i][j]
     }
 
     /**
@@ -98,7 +118,7 @@ export class GraphMatrix {
     public getNeighbors(i: number): Array<number> {
         const neighbors: Array<number> = []
         for (let j = 0; j < this.size(); j++) {
-            if (this.matrix[i][j] > 0) {
+            if (this.matrix[i][j]) {
                 neighbors.push(j)
             }
         }
