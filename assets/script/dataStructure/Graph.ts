@@ -1,9 +1,10 @@
 /*
  * @Author: hyrm 
- * @Date: 2024-04-16 16:25:03 
- * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-27 16:28:34
+ * @Date: 2024-04-27 17:10:24 
+ * @Last Modified by:   hyrm 
+ * @Last Modified time: 2024-04-27 17:10:24 
  */
+
 
 // 基于邻接举证实现
 export class GraphMatrix<T> {

@@ -1,9 +1,10 @@
 /*
  * @Author: hyrm 
- * @Date: 2024-04-27 16:25:39 
+ * @Date: 2024-04-27 17:10:34 
  * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-04-27 16:25:39 
+ * @Last Modified time: 2024-04-27 17:10:34 
  */
+
 export function getMidpoint(point1: cc.Vec2, point2: cc.Vec2): cc.Vec2 {
     const xMid = (point1.x + point2.x) / 2;
     const yMid = (point1.y + point2.y) / 2;
@@ -59,8 +60,3 @@ export function flatVertexs2Vec2(vertexs: Array<number>) {
     }
     return result
 }
-
-
-
-
-
