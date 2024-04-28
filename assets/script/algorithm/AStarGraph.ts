@@ -77,7 +77,7 @@ export class AStarGraph {
         return this.triangles
     }
 
-    public findTrianglePath(start: cc.Vec2, end: cc.Vec2, progressCallback?: Function): { trianglesPath: Array<Triangle>, pointsPath: Array<cc.Vec2> } {
+    public findTrianglePath(start: cc.Vec2, end: cc.Vec2, progressCallback?: Function): { trianglesPath: Array<Triangle>, pointsPath: Array<cc.Vec2>, apexPath: Array<cc.Vec2> } {
 
         const startTriangleId = this.getTriangleIdByPos(start)
         const endTriangleId = this.getTriangleIdByPos(end)
@@ -143,12 +143,13 @@ export class AStarGraph {
                 }
 
                 // 漏斗算法(拉绳子)
+                const apexList = [start]
                 let apex = start
-                let left, right
+                let left: cc.Vec2
+                let right: cc.Vec2
                 for (const [index, triangle] of trianglesPath.entries()) {
                     if (index + 1 === trianglesPath.length) break
                     const edge = this.graph.getEdge(triangle.id, trianglesPath[index + 1].id)
-
                     // 首次确定左右点,采用和中线叉积任意顶点
                     if (!left || !right) {
                         const apexMidVec = getMidpoint(edge[0], edge[1]).sub(apex)
@@ -163,23 +164,67 @@ export class AStarGraph {
                         continue
                     }
 
+                    let changeVec: cc.Vec2
+                    const oriLeft = left, oriRight = right
 
-
+                    // 更新右边点
                     if (edge.includes(left)) {
-                        right = edge[edge.indexOf(right)]
+                        const leftindex = edge.indexOf(left)
+                        right = edge[leftindex == 0 ? 1 : 0]
+                        changeVec = right
+
+                        const apexLeftVec = left.sub(apex)
+                        const apexRightVec = right.sub(apex)
+                        const apexOriRightVec = oriRight.sub(apex)
+
+
+                        if (apexOriRightVec.cross(apexRightVec) < 0 && apexLeftVec.cross(apexRightVec) > 0) {
+                            apex = oriRight
+                            apexList.push(apex)
+                        }
+
+                        // 越过左边点
+                        if (apexOriRightVec.cross(apexRightVec) > 0 && apexLeftVec.cross(apexRightVec) > 0) {
+                            apex = oriLeft
+                            apexList.push(apex)
+                            const tempLeft = left
+                            left = right
+                            right = tempLeft
+                        }
+
+
                     }
 
+                    // 更新左边点
                     if (edge.includes(right)) {
-                        left = edge[edge.indexOf(left)]
-                    }
+                        const rightindex = edge.indexOf(right)
+                        left = edge[rightindex == 0 ? 1 : 0]
+                        changeVec = left
 
-                    // 计算漏斗大小是否变大，如果变大，则更新apex点
+                        const apexLeftVec = left.sub(apex)
+                        const apexRightVec = right.sub(apex)
+                        const apexOriLeftVec = oriLeft.sub(apex)
+
+                        if (apexOriLeftVec.cross(apexLeftVec) > 0 && apexRightVec.cross(apexLeftVec) > 0) {
+                            apex = oriLeft
+                            apexList.push(apex)
+                        }
+
+                        // 越过右边点
+                        if (apexRightVec.cross(apexLeftVec) < 0 && apexOriLeftVec.cross(apexLeftVec) < 0) {
+                            apex = oriRight
+                            apexList.push(apex)
+                            const tempLeft = left
+                            left = right
+                            right = tempLeft
+                        }
+                    }
 
                 }
 
 
-
-                return { trianglesPath: trianglesPath.reverse(), pointsPath }
+                apexList.push(end)
+                return { trianglesPath: trianglesPath.reverse(), pointsPath, apexPath: apexList }
             }
         }
     }

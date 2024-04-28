@@ -155,6 +155,7 @@ export default class Main extends cc.Component {
                 path.pointsPath.unshift(start)
                 this.drawLine(pathGraphics, path.pointsPath)
 
+                this.drawLine(pathGraphics, path.apexPath, cc.Color.BLUE)
 
 
             }
@@ -1121,9 +1122,9 @@ export default class Main extends cc.Component {
         const triangleVerticesIndexs = earcut(polygonVerticesFlat)
 
         this.astarGraph = new AStarGraph(flatVertexs2Vec2(polygonVerticesFlat), triangleVerticesIndexs)
-        for (const triangle of this.astarGraph.trianglesMesh) {
-            this.drawTriangle(this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics), triangle)
-        }
+        // for (const triangle of this.astarGraph.trianglesMesh) {
+        //     this.drawTriangle(this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics), triangle)
+        // }
 
     }
 
@@ -1150,14 +1151,14 @@ export default class Main extends cc.Component {
         }
     }
 
-    private drawLine(ctx: cc.Graphics, points: Array<cc.Vec2>) {
+    private drawLine(ctx: cc.Graphics, points: Array<cc.Vec2>, color: cc.Color = cc.Color.BLACK) {
 
         ctx.moveTo(points[0].x, points[0].y)
         for (let i = 1; i < points.length; i++) {
             ctx.lineTo(points[i].x, points[i].y)
         }
         ctx.lineWidth = 5
-        ctx.strokeColor = cc.Color.BLACK
+        ctx.strokeColor = color
         ctx.stroke()
     }
 
