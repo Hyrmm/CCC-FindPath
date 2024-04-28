@@ -12,6 +12,7 @@ import { AStarGraph, Triangle } from './script/algorithm/AStarGraph'
 import { flatVertexs2Vec2, getCommonVertexs } from './script/utils/Utils'
 import { Entity } from './script/components/EntityContainer'
 import EntityContainer from './script/components/EntityContainer'
+import { AStarGridMesh, MapData } from "./script/algorithm/AStarGridGraph"
 @ccclass
 export default class Main extends cc.Component {
 
@@ -44,6 +45,7 @@ export default class Main extends cc.Component {
 
 
     private astarGraph: AStarGraph = null
+    private astarGraphMesh: AStarGridMesh = null
 
 
     protected start() {
@@ -66,6 +68,21 @@ export default class Main extends cc.Component {
 
         // 首次地图可视范围更新
         this.updateViewPortMapTileNodes()
+
+        cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
+            const astarGraph = new AStarGridMesh(data.json as MapData)
+            for (const block of astarGraph.blocks) {
+
+
+                this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics).rect(block.x, block.y, 32, 32)
+            }
+
+            this.astarGraphMesh = astarGraph
+
+
+        })
+
+
 
     }
 
@@ -111,6 +128,8 @@ export default class Main extends cc.Component {
             if (isPlacingEnd) isPlacingEnd = false
             if (isPlacingRole) isPlacingRole = false
 
+            console.log(this.astarGraphMesh.getBlockByPos(mapPos))
+
         }, this)
 
         this.viewPort.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
@@ -143,8 +162,10 @@ export default class Main extends cc.Component {
 
                 const pathGraphics = this.graphicsContainer.getChildByName("path_graphics").getComponent(cc.Graphics)
                 pathGraphics.clear()
-
+                
+                console.time("triangleMesh")
                 const path = this.astarGraph.findTrianglePath(start, end)
+                console.timeEnd("triangleMesh")
                 for (const triangle of path.trianglesPath) {
                     this.drawTriangle(pathGraphics, triangle, cc.Color.GREEN)
                 }
@@ -154,9 +175,12 @@ export default class Main extends cc.Component {
                 path.pointsPath.push(end)
                 path.pointsPath.unshift(start)
                 this.drawLine(pathGraphics, path.pointsPath)
-
                 this.drawLine(pathGraphics, path.apexPath, cc.Color.BLUE)
 
+                console.time("gridMesh")
+                const result = this.astarGraphMesh.findPath(start, end)
+                console.timeEnd("gridMesh")
+                console.log(result)
 
             }
             isPlacingEnd = !isPlacingEnd
