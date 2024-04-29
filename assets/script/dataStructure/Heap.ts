@@ -122,7 +122,7 @@ export interface HeapItem {
 
 
 // 大顶堆
-export class MaxHeap<T extends HeapItem> extends Heap<T>{
+export class MaxHeap<T extends HeapItem> extends Heap<T> {
     /**
      *  从底部到顶部堆化
      * @param i 节点索引
@@ -172,7 +172,7 @@ export class MaxHeap<T extends HeapItem> extends Heap<T>{
 }
 
 // 小顶堆
-export class MinHeap<T extends HeapItem> extends Heap<T>{
+export class MinHeap<T extends HeapItem> extends Heap<T> {
 
     /**
     *  从底部到顶部堆化
@@ -219,6 +219,15 @@ export class MinHeap<T extends HeapItem> extends Heap<T>{
             // 下一轮堆化
             i = maxIndex
         }
+    }
+
+    /**
+     * 堆中是否存在元素
+     * @param item 元素
+     * @returns 
+     */
+    public includes(item: T): boolean {
+        return item.value ? true : false
     }
 }
 

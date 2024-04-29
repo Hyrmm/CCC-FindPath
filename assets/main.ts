@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-28 21:10:08
+ * @Last Modified time: 2024-04-29 23:04:56
  */
 
 const { ccclass, property } = cc._decorator
@@ -12,7 +12,7 @@ import { AStarGraph, Triangle } from './script/algorithm/AStarGraph'
 import { flatVertexs2Vec2, getCommonVertexs } from './script/utils/Utils'
 import { Entity } from './script/components/EntityContainer'
 import EntityContainer from './script/components/EntityContainer'
-import { AStarGridMesh, MapData } from "./script/algorithm/AStarGridGraph"
+import { AStarGridMesh, MapData, Block } from "./script/algorithm/AStarGridGraph"
 @ccclass
 export default class Main extends cc.Component {
 
@@ -71,15 +71,7 @@ export default class Main extends cc.Component {
 
         cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
             const astarGraph = new AStarGridMesh(data.json as MapData)
-            for (const block of astarGraph.blocks) {
-
-
-                this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics).rect(block.x, block.y, 32, 32)
-            }
-
             this.astarGraphMesh = astarGraph
-
-
         })
 
 
@@ -162,7 +154,7 @@ export default class Main extends cc.Component {
 
                 const pathGraphics = this.graphicsContainer.getChildByName("path_graphics").getComponent(cc.Graphics)
                 pathGraphics.clear()
-                
+
                 console.time("triangleMesh")
                 const path = this.astarGraph.findTrianglePath(start, end)
                 console.timeEnd("triangleMesh")
@@ -181,6 +173,7 @@ export default class Main extends cc.Component {
                 const result = this.astarGraphMesh.findPath(start, end)
                 console.timeEnd("gridMesh")
                 console.log(result)
+                this.drawRect(pathGraphics, result)
 
             }
             isPlacingEnd = !isPlacingEnd
@@ -2067,6 +2060,17 @@ export default class Main extends cc.Component {
                 tileObject.node.addComponent(cc.Sprite).spriteFrame = spriteFrame
             })
         }
+    }
+
+    private drawRect(ctx: cc.Graphics, blocks: Array<Block>, color: cc.Color = cc.Color.BLACK) {
+        for (const block of blocks) {
+            const pos = this.astarGraphMesh.getPosByBlock(block)
+            ctx.strokeColor = cc.color(0, 0, 0, 150)
+            // ctx.rect(pos.x, pos.y, 32, 32)
+            ctx.fillRect(pos.x, pos.y, 32, 32)
+        }
+
+
     }
 
     private drawLine(ctx: cc.Graphics, points: Array<cc.Vec2>, color: cc.Color = cc.Color.BLACK) {

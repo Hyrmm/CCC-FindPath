@@ -1,5 +1,11 @@
+/*
+ * @Author: hyrm 
+ * @Date: 2024-04-29 22:47:35 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-04-30 00:04:28
+ */
 import { GraphMatrix } from "../dataStructure/Graph"
-import { MinHeap } from "../dataStructure/Heap"
+import { MinHeap, HeapItem } from "../dataStructure/Heap"
 
 
 enum BlockType {
@@ -9,7 +15,7 @@ enum BlockType {
     END = 3,
 }
 
-export class Block {
+export class Block implements HeapItem {
     public f: number
     public g: number
     public h: number
@@ -19,6 +25,8 @@ export class Block {
 
     public type: BlockType
     public parent: Block
+
+    public value: number = 0
 
     constructor(x: number, y: number, type: BlockType) {
         this.x = x
@@ -37,8 +45,9 @@ export class AStarGridMesh {
     private mapWidth: number
     private mapHeight: number
 
-    private openList: Array<Block> = []
-    private closeList: Map<Block, Block> = new Map()
+    private openList: MinHeap<Block>
+    private openListMap: Map<number, Block> = new Map()
+    private closeListMap: Map<number, Block> = new Map()
 
     constructor(mapData: MapData) {
         // 构建格子地图
@@ -64,61 +73,66 @@ export class AStarGridMesh {
 
 
     public findPath(startPos: cc.Vec2, endPos: cc.Vec2): Array<Block> {
-        // 初始化,清理上次寻路开启、关闭列表
-        this.openList = []
-        this.closeList = new Map()
 
-        const startBlock = this.getBlockByPos(startPos)
+        // 初始化,清理上次寻路开启、关闭列表
+        this.openList = new MinHeap<Block>([])
+        this.openListMap = new Map<number, Block>()
+        this.closeListMap = new Map<number, Block>()
+
+
         const endBlock = this.getBlockByPos(endPos)
+        const startBlock = this.getBlockByPos(startPos)
 
         // 循环寻找 targetBlock 周围的8个其他 block,首次从 startBlock 开始
-        let curStartBlock = startBlock
+        let curSeekBlock = startBlock
 
         while (true) {
 
-            const startBlockNeighbors = this.getNeighbors(curStartBlock)
+            const startBlockNeighbors = this.getNeighbors(curSeekBlock)
 
             // 计算f,g,h值
-            for (const [directIndex, block] of startBlockNeighbors.entries()) {
+            for (const block of startBlockNeighbors) {
 
-                if (!block || block.type === BlockType.WALL || this.openList.includes(block) || this.closeList.has(block)) {
+                if (!block || block.type === BlockType.WALL || this.openListMap.has(block.value) || this.closeListMap.has(block.value)) {
                     continue
                 }
-                block.parent = curStartBlock
 
-                const neighborG = block.parent.g ? block.parent.g : 0 + (directIndex % 2 == 0 ? 1.4 : 1)
+                block.parent = curSeekBlock
+
+                block.g = block.parent.g ? block.parent.g + 1 : 1
 
                 // 启发函数代价、以及动态权重值
                 const heuristicDistance = AStarGridMesh.calcHeuristicDistance(block, endBlock)
-                const dynamicWeight = AStarGridMesh.calcDynamicWeight(neighborG, heuristicDistance)
-                const neighborH = heuristicDistance * dynamicWeight
+                const dynamicWeight = AStarGridMesh.calcDynamicWeight(block.g, heuristicDistance)
 
-                const neighborF = neighborG + neighborH
+                block.h = heuristicDistance * dynamicWeight
+                block.f = block.g + block.h
 
-                block.f = neighborF
-                block.g = neighborG
-                block.h = neighborH
+                block.value = block.f
 
                 this.openList.push(block)
+                this.openListMap.set(block.value, block)
             }
-            if (this.openList.length === 0) return []
-            // 从 openList 中找到 f 值最小的 block,放入 closeList，并从 openList 中删除，并设置为 targetBlock
-            this.openList.sort((pre, next) => pre.f - next.f)
-            curStartBlock = this.openList.shift()
-            this.closeList.set(curStartBlock, curStartBlock)
 
-            if (curStartBlock === endBlock) {
+            // 开启列表为空，没有通过路径
+            if (this.openList.size === 0) return []
+
+            // 从 openList 中找到 f 值最小的 block,放入 closeList，并从 openList 中删除，并设置为 targetBlock
+            curSeekBlock = this.openList.pop()
+            this.closeListMap.set(curSeekBlock.value, curSeekBlock)
+
+            if (curSeekBlock === endBlock) {
+
                 // 回溯路径
                 const path: Array<Block> = []
-                let currentBlock = curStartBlock
+                let curRecallBlock = curSeekBlock
 
-                while (currentBlock !== startBlock) {
-                    path.push(currentBlock)
-                    currentBlock = currentBlock.parent
+                while (curRecallBlock !== startBlock) {
+                    path.push(curRecallBlock)
+                    curRecallBlock = curRecallBlock.parent
                 }
-                path.push(currentBlock)
-                path.reverse()
-                return path
+
+                return path.reverse()
             }
         }
     }
@@ -158,6 +172,11 @@ export class AStarGridMesh {
         return this.blocks[blockY][blockX]
     }
 
+    public getPosByBlock(block: Block): cc.Vec2 {
+        const x = block.x * this.blockWidth - this.mapWidth / 2
+        const y = block.y * this.blockHeight - this.mapHeight / 2
+        return new cc.Vec2(x, y)
+    }
     /**
     * 计算启发函数值:曼哈顿距离、欧几里得距离、对角线距离
     * @param block1 
@@ -189,6 +208,52 @@ export class AStarGridMesh {
         } else {
             return 0.8
         }
+    }
+
+
+    /**
+     * 判断两节点之间是否存在障碍物 
+     * 
+     */
+    public hasBarrier(startBlock: Block, endBlock: Block) {
+
+        const blockWidth = this.blockWidth
+        const blockHeight = this.blockHeight
+
+        const startX = this.getPosByBlock(startBlock).x + this.blockWidth / 2
+        const startY = this.getPosByBlock(startBlock).y + this.blockHeight / 2
+        const endX = this.getPosByBlock(endBlock).x + this.blockWidth / 2
+        const endY = this.getPosByBlock(endBlock).y + this.blockHeight / 2
+
+        const distX = Math.abs(endX - startX)
+        const distY = Math.abs(endY - startY)
+        const loopDirection = distX > distY ? true : false
+
+
+
+
+        if (loopDirection) {
+            
+            const loopStart = Math.min(startBlock.x, endBlock.x)
+            const loopEnd = Math.max(startBlock.x, endBlock.x)
+            for (let i = loopStart; i <= loopEnd; i += blockWidth) {
+                if (i == loopStart) i += blockWidth / 2
+
+
+                if (i == loopEnd + blockWidth / 2) i -= blockWidth / 2
+            }
+        } else {
+            const loopStart = Math.min(startBlock.y, endBlock.y)
+            const loopEnd = Math.max(startBlock.y, endBlock.y)
+
+            for (let i = loopStart; i <= loopEnd; i += blockHeight) {
+                if (i == loopStart) i += blockHeight / 2
+
+
+                if (i == loopEnd + blockHeight / 2) i -= blockHeight / 2
+            }
+        }
+
     }
 
 

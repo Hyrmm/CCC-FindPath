@@ -1,8 +1,8 @@
 /*
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:34 
- * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-04-27 17:10:34 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-04-30 00:06:25
  */
 
 export function getMidpoint(point1: cc.Vec2, point2: cc.Vec2): cc.Vec2 {
@@ -51,6 +51,12 @@ export function getCommonVertexs(vertexs1: Array<cc.Vec2>, vertexs2: Array<cc.Ve
         }
     }
     return result
+}
+
+export function getLineFunc(): (point: number, type: number) => number {
+    return (point: number, type: number) => {
+        return 0 
+    }
 }
 
 export function flatVertexs2Vec2(vertexs: Array<number>) {
