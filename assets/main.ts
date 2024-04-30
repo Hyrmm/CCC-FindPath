@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-29 23:04:56
+ * @Last Modified time: 2024-04-30 18:25:21
  */
 
 const { ccclass, property } = cc._decorator
@@ -12,7 +12,7 @@ import { AStarGraph, Triangle } from './script/algorithm/AStarGraph'
 import { flatVertexs2Vec2, getCommonVertexs } from './script/utils/Utils'
 import { Entity } from './script/components/EntityContainer'
 import EntityContainer from './script/components/EntityContainer'
-import { AStarGridMesh, MapData, Block } from "./script/algorithm/AStarGridGraph"
+import { AStarGridMesh, MapData, Block } from "./script/algorithm/AStarGridMesh"
 @ccclass
 export default class Main extends cc.Component {
 
@@ -34,6 +34,9 @@ export default class Main extends cc.Component {
     @property(cc.Node)
     entity_end: cc.Node = null
 
+    graphics_path: cc.Graphics = null
+    graphics_mesh: cc.Graphics = null
+
     private entityContainerCom: EntityContainer
 
     private isTouching: boolean = false
@@ -50,6 +53,9 @@ export default class Main extends cc.Component {
 
     protected start() {
         this.entityContainerCom = this.entityContainer.getComponent(EntityContainer)
+
+        this.graphics_path = this.graphicsContainer.getChildByName("path_graphics").getComponent(cc.Graphics)
+        this.graphics_mesh = this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics)
 
         console.time("init")
         // 地图触摸相关事件监听
@@ -68,10 +74,39 @@ export default class Main extends cc.Component {
 
         // 首次地图可视范围更新
         this.updateViewPortMapTileNodes()
-
         cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
             const astarGraph = new AStarGridMesh(data.json as MapData)
             this.astarGraphMesh = astarGraph
+            const ctx = this.graphics_mesh
+
+            ctx.strokeColor = cc.color(0, 0, 0, 100)
+            // rows
+            for (let i = 1; i < this.mapOriSize.height / 32; i++) {
+                const startPos = cc.v2(0 - this.mapOriSize.width / 2, i * 32 - this.mapOriSize.height / 2)
+                const endPos = cc.v2(this.mapOriSize.width - this.mapOriSize.width / 2, i * 32 - this.mapOriSize.height / 2)
+
+                ctx.moveTo(startPos.x, startPos.y)
+                ctx.lineTo(endPos.x, endPos.y)
+                ctx.stroke()
+            }
+
+            // lines
+            for (let i = 1; i < this.mapOriSize.width / 32; i++) {
+                const startPos = cc.v2(i * 32 - this.mapOriSize.width / 2, 0 - this.mapOriSize.height / 2)
+                const endPos = cc.v2(i * 32 - this.mapOriSize.width / 2, this.mapOriSize.height - this.mapOriSize.height / 2)
+
+                ctx.moveTo(startPos.x, startPos.y)
+                ctx.lineTo(endPos.x, endPos.y)
+                ctx.stroke()
+
+            }
+
+
+            for (const block of astarGraph.getAllBlocks()) {
+                
+            }
+
+
         })
 
 
@@ -113,14 +148,21 @@ export default class Main extends cc.Component {
             this.isTouching = true
 
             const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
-            mapPos.x = Math.ceil(mapPos.x)
-            mapPos.y = Math.ceil(mapPos.y)
-            this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${mapPos.x.toFixed(2)}, ${mapPos.y.toFixed(2)})\n(triangle:${this.astarGraph.getTriangleIdByPos(mapPos)})`
+            const blockPos = this.astarGraphMesh.getBlockByPos(mapPos)
+            const entityPos = this.entity_start.getPosition()
+
+            this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${Math.ceil(mapPos.x)},${Math.ceil(mapPos.y)})\n(${blockPos.x},${blockPos.y})`
+
+            console.time("gridMesh")
+            console.log(mapPos)
+            const result = this.astarGraphMesh.findPath(entityPos, cc.v2(Math.ceil(mapPos.x), Math.ceil(mapPos.y)))
+            console.timeEnd("gridMesh")
+            console.log(result)
+            this.drawRect(this.graphics_path, result)
+
 
             if (isPlacingEnd) isPlacingEnd = false
             if (isPlacingRole) isPlacingRole = false
-
-            console.log(this.astarGraphMesh.getBlockByPos(mapPos))
 
         }, this)
 
@@ -134,7 +176,6 @@ export default class Main extends cc.Component {
 
         this.viewPort.on(cc.Node.EventType.MOUSE_MOVE, (event: cc.Event.EventMouse) => {
             const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
-
             if (isPlacingEnd) {
                 this.entity_end.x = Math.ceil(mapPos.x)
                 this.entity_end.y = Math.ceil(mapPos.y)
@@ -2062,15 +2103,15 @@ export default class Main extends cc.Component {
         }
     }
 
-    private drawRect(ctx: cc.Graphics, blocks: Array<Block>, color: cc.Color = cc.Color.BLACK) {
+    private drawRect(ctx: cc.Graphics, blocks: Array<Block>, color: cc.Color = cc.Color.GREEN) {
+        ctx.clear()
         for (const block of blocks) {
             const pos = this.astarGraphMesh.getPosByBlock(block)
-            ctx.strokeColor = cc.color(0, 0, 0, 150)
-            // ctx.rect(pos.x, pos.y, 32, 32)
-            ctx.fillRect(pos.x, pos.y, 32, 32)
+            ctx.rect(pos.x, pos.y, 32, 32)
         }
-
-
+        ctx.lineWidth = 5
+        ctx.strokeColor = color
+        ctx.stroke()
     }
 
     private drawLine(ctx: cc.Graphics, points: Array<cc.Vec2>, color: cc.Color = cc.Color.BLACK) {

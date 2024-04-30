@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:54:52 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-27 19:24:40
+ * @Last Modified time: 2024-04-30 15:43:41
  */
 
 const { ccclass, property } = cc._decorator;
@@ -37,7 +37,7 @@ export default class EntityContainer extends cc.Component {
             if ((!entity.shadowPos || !entity.shadowPos.length) && !entity.curShadowPos) return
 
             if (!entity.curShadowPos) entity.curShadowPos = entity.shadowPos.shift()
-
+            
             const curPos = entity.position
             const curShadowPos = entity.curShadowPos
             const offsetPos = new cc.Vec2(curShadowPos.x - curPos.x, curShadowPos.y - curPos.y)

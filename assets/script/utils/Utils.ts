@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:34 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-30 00:06:25
+ * @Last Modified time: 2024-04-30 14:43:18
  */
 
 export function getMidpoint(point1: cc.Vec2, point2: cc.Vec2): cc.Vec2 {
@@ -52,11 +52,44 @@ export function getCommonVertexs(vertexs1: Array<cc.Vec2>, vertexs2: Array<cc.Ve
     }
     return result
 }
+/**
+ * 
+ * @param point1 
+ * @param point2 
+ * @param type 0:根据x值求y值 1:根据y值求x值
+ * @returns 
+ */
+export function getLineFunc(point1: cc.Vec2, point2: cc.Vec2, type: number): (p: number) => number {
 
-export function getLineFunc(): (point: number, type: number) => number {
-    return (point: number, type: number) => {
-        return 0 
+    if (point1.x === point2.x) {
+
+        if (type == 0) {
+            throw new Error("两点所确定直线垂直于x轴，不能根据x值得到y值");
+        }
+        else if (type == 1) {
+            return (y: number) => point1.x
+        }
+
     }
+    else if (point1.y === point2.y) {
+        if (type == 0) {
+            return (x: number) => point1.y
+        }
+        else if (type == 1) {
+            throw new Error("两点所确定直线垂直于y轴，不能根据y值得到x值");
+        }
+    }
+
+    const k = (point2.y - point1.y) / (point2.x - point1.x)
+    const b = point1.y - k * point1.x
+
+    if (type == 0) {
+        return (x: number) => k * x + b
+    }
+    else if (type == 1) {
+        return (y: number) => (y - b) / k
+    }
+
 }
 
 export function flatVertexs2Vec2(vertexs: Array<number>) {
