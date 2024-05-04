@@ -2,17 +2,14 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-30 18:25:21
+ * @Last Modified time: 2024-05-05 00:48:08
  */
 
 const { ccclass, property } = cc._decorator
-import earcut from "earcut"
-import { QuadTree, QuadTreeObject, QuadTreeRect } from './script/dataStructure/QuadTree'
-import { AStarGraph, Triangle } from './script/algorithm/AStarGraph'
-import { flatVertexs2Vec2, getCommonVertexs } from './script/utils/Utils'
-import { Entity } from './script/components/EntityContainer'
+import { QuadTree, QuadTreeRect } from './script/dataStructure/QuadTree'
 import EntityContainer from './script/components/EntityContainer'
-import { AStarGridMesh, MapData, Block } from "./script/algorithm/AStarGridMesh"
+import { AStarGridMesh, Block, BlockType } from "./script/algorithm/AStarGridMesh"
+import GraphicsContainer, { GraphicsType } from './script/components/GraphicsContainer'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -32,14 +29,21 @@ export default class Main extends cc.Component {
     entity_start: cc.Node = null
 
     @property(cc.Node)
-    entity_end: cc.Node = null
+    btn_edit: cc.Node = null
 
-    graphics_path: cc.Graphics = null
-    graphics_mesh: cc.Graphics = null
+    @property(cc.Node)
+    lbl_pos: cc.Node = null
+
+    @property(cc.Node)
+    lbl_mode: cc.Node = null
 
     private entityContainerCom: EntityContainer
+    private graphicsContainerCom: GraphicsContainer
 
-    private isTouching: boolean = false
+    private isEditing: boolean = false
+    private editingBlock: BlockType = BlockType.BLOCK
+    private isTouchMoving: boolean = false
+
     private mapQuadTree: QuadTree<tileMapData> = null
     private mapQuadSize: number = 16
 
@@ -48,89 +52,33 @@ export default class Main extends cc.Component {
 
     private astarGridhMesh: AStarGridMesh = null
 
+    private mapData: MapData = null
 
     protected start() {
         this.entityContainerCom = this.entityContainer.getComponent(EntityContainer)
+        this.graphicsContainerCom = this.graphicsContainer.getComponent(GraphicsContainer)
 
-        this.graphics_path = this.graphicsContainer.getChildByName("path_graphics").getComponent(cc.Graphics)
-        this.graphics_mesh = this.graphicsContainer.getChildByName("mesh_graphics").getComponent(cc.Graphics)
-
-        console.time("init")
-        // 地图触摸相关事件监听
-        this.initTouchEventListener()
-        console.timeEnd("init")
-
-        console.time("QuadTree")
         // 四叉树初始化(用于动态加载可视区域显示地图)
-        this.initTileMapQuadTree()
+        console.time("QuadTree")
+        this.initQuadTree()
         console.timeEnd("QuadTree")
 
-        console.time("meshGraph")
         // 寻路网格初始化(用于寻路算法)
+        console.time("astarGridMesh")
         this.initAStarGridMesh()
-        console.timeEnd("meshGraph")
+        console.timeEnd("astarGridMesh")
+
+        // 地图触摸相关事件监听
+        this.initEventListener()
 
         // 首次地图可视范围更新
         this.updateViewPortMapTileNodes()
 
-
-
     }
 
 
 
-    private initTouchEventListener() {
-        this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
-            if (!this.isTouching) return
-
-            const delta = event.touch.getDelta()
-
-            // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
-            const changePosY = this.mapContainer.y + delta.y
-            const changePosX = this.mapContainer.x + delta.x
-
-            if (Math.abs(changePosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
-                this.mapContainer.x = changePosX
-                this.entityContainer.x = changePosX
-                this.graphicsContainer.x = changePosX
-            }
-
-            if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
-                this.mapContainer.y = changePosY
-                this.entityContainer.y = changePosY
-                this.graphicsContainer.y = changePosY
-            }
-
-            this.updateViewPortMapTileNodes()
-
-        }, this)
-
-        this.viewPort.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
-            this.isTouching = true
-
-            const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
-            const blockPos = this.astarGridhMesh.getBlockByPos(mapPos)
-            const entityPos = this.entity_start.getPosition()
-
-            this.node.getChildByName("fixed").getChildByName("lbl_pos").getComponent(cc.Label).string = `(${Math.ceil(mapPos.x)},${Math.ceil(mapPos.y)})\n(${blockPos.x},${blockPos.y})`
-
-            console.time("gridMesh")
-            const result = this.astarGridhMesh.findPath(entityPos, cc.v2(Math.ceil(mapPos.x), Math.ceil(mapPos.y)))
-            console.timeEnd("gridMesh")
-            this.drawRect(this.graphics_path, result)
-
-        }, this)
-
-        this.viewPort.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
-            this.isTouching = false
-        }, this)
-
-        this.viewPort.on(cc.Node.EventType.TOUCH_CANCEL, (event: cc.Event.EventTouch) => {
-            this.isTouching = false
-        }, this)
-    }
-
-    private initTileMapQuadTree() {
+    private initQuadTree() {
 
         const boundsPosX = -this.mapOriSize.width / 2
         const boundsPosY = -this.mapOriSize.height / 2
@@ -168,37 +116,123 @@ export default class Main extends cc.Component {
 
     private initAStarGridMesh() {
         cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
-            const astarGraph = new AStarGridMesh(data.json as MapData)
-            this.astarGridhMesh = astarGraph
-            const ctx = this.graphics_mesh
 
-            ctx.strokeColor = cc.color(0, 0, 0, 100)
-            // rows
-            for (let i = 1; i < this.mapOriSize.height / 32; i++) {
-                const startPos = cc.v2(0 - this.mapOriSize.width / 2, i * 32 - this.mapOriSize.height / 2)
-                const endPos = cc.v2(this.mapOriSize.width - this.mapOriSize.width / 2, i * 32 - this.mapOriSize.height / 2)
-
-                ctx.moveTo(startPos.x, startPos.y)
-                ctx.lineTo(endPos.x, endPos.y)
-                ctx.stroke()
-            }
-
-            // lines
-            for (let i = 1; i < this.mapOriSize.width / 32; i++) {
-                const startPos = cc.v2(i * 32 - this.mapOriSize.width / 2, 0 - this.mapOriSize.height / 2)
-                const endPos = cc.v2(i * 32 - this.mapOriSize.width / 2, this.mapOriSize.height - this.mapOriSize.height / 2)
-
-                ctx.moveTo(startPos.x, startPos.y)
-                ctx.lineTo(endPos.x, endPos.y)
-                ctx.stroke()
-
-            }
-
-
-            // for (const block of astarGraph.getAllBlocks()) {
-
-            // }
+            this.mapData = data.json as MapData
+            this.astarGridhMesh = new AStarGridMesh(data.json as MapData)
+            this.drawMapMesh()
         })
+    }
+
+    private initEventListener() {
+
+        this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
+            this.isTouchMoving = true
+
+            const delta = event.touch.getDelta()
+
+            // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
+            const changePosY = this.mapContainer.y + delta.y
+            const changePosX = this.mapContainer.x + delta.x
+
+            if (Math.abs(changePosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
+                this.mapContainer.x = changePosX
+                this.entityContainer.x = changePosX
+                this.graphicsContainer.x = changePosX
+            }
+
+            if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
+                this.mapContainer.y = changePosY
+                this.entityContainer.y = changePosY
+                this.graphicsContainer.y = changePosY
+            }
+
+            this.updateViewPortMapTileNodes()
+
+        }, this)
+
+        this.viewPort.on(cc.Node.EventType.TOUCH_START, (event: cc.Event.EventTouch) => {
+            this.isTouchMoving = false
+        }, this)
+
+        this.viewPort.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
+            // 寻路
+            if (!this.isTouchMoving && !this.isEditing) {
+                const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
+                const entityPos = this.entity_start.getPosition()
+
+                this.graphicsContainerCom.clear(GraphicsType.PATH)
+
+                const result = this.astarGridhMesh.findPath(entityPos, cc.v2(Math.ceil(mapPos.x), Math.ceil(mapPos.y)), (block) => {
+                    const blockPos = this.astarGridhMesh.getPosByBlock(block)
+                    this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(blockPos.x, blockPos.y, 32, 32), cc.Color.GRAY)
+                })
+
+                // 一般寻路路径
+                for (const block of result.path) {
+                    const blockPos = this.astarGridhMesh.getPosByBlock(block)
+                    this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(blockPos.x, blockPos.y, 32, 32), cc.color(0, 0, 255, 255))
+                }
+
+                // 合并共线路径
+                for (const block of result.collinearPath) {
+                    const blockPos = this.astarGridhMesh.getPosByBlock(block)
+                    this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(blockPos.x, blockPos.y, 32, 32), cc.color(255, 255, 255, 255))
+                }
+
+                // 去除拐点路径
+                for (const [index, block] of result.smoothPath.entries()) {
+                    const blockPos = this.astarGridhMesh.getPosByBlock(block)
+                    this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(blockPos.x + 8, blockPos.y + 8, 16, 16), cc.color(0, 0, 0, 255), true)
+
+                    if (index < result.smoothPath.length - 1) {
+                        const startPos = this.astarGridhMesh.getPosByBlock(result.smoothPath[index])
+                        const endPos = this.astarGridhMesh.getPosByBlock(result.smoothPath[index + 1])
+                        this.graphicsContainerCom.drawLine(GraphicsType.PATH, [cc.v2(startPos.x + 16, startPos.y + 16), cc.v2(endPos.x + 16, endPos.y + 16)], cc.Color.ORANGE)
+                    }
+                }
+            }
+            // 编辑地图
+            if (this.isEditing && !this.isTouchMoving) {
+                const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
+                const block = this.astarGridhMesh.getBlockByPos(mapPos)
+                const blockPos = this.astarGridhMesh.getPosByBlock(block)
+                this.lbl_pos.getComponent(cc.Label).string = `(${Math.ceil(mapPos.x)},${Math.ceil(mapPos.y)})\n(${blockPos.x},${blockPos.y})`
+                block.type = this.editingBlock
+                this.mapData.roadDataArr[block.y][block.x] = block.type
+                this.drawMapMesh()
+            }
+
+            this.isTouchMoving = false
+        }, this)
+
+        this.viewPort.on(cc.Node.EventType.TOUCH_CANCEL, (event: cc.Event.EventTouch) => {
+            this.isTouchMoving = false
+        }, this)
+
+        this.btn_edit.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
+            if (this.isEditing) {
+                this.drawMapMesh()
+                this.outPutMapData()
+            }
+
+            this.isEditing = !this.isEditing
+            this.btn_edit.getChildByName("lbl").getComponent(cc.Label).string = this.isEditing ? "保存" : "编辑"
+            this.lbl_mode.color = this.editingBlock === BlockType.BLOCK ? cc.Color.GREEN : cc.Color.RED
+            this.lbl_mode.active = this.isEditing
+        })
+
+        cc.systemEvent.on(cc.SystemEvent.EventType.KEY_DOWN, (event: cc.Event.EventKeyboard) => {
+            switch (event.keyCode) {
+                case cc.macro.KEY.w:
+                    this.editingBlock = BlockType.BLOCK
+                    break
+                case cc.macro.KEY.e:
+                    this.editingBlock = BlockType.WALL
+                    break
+            }
+            this.lbl_mode.color = this.editingBlock == BlockType.BLOCK ? cc.Color.GREEN : cc.Color.RED
+        })
+
     }
 
     private updateViewPortMapTileNodes() {
@@ -224,41 +258,45 @@ export default class Main extends cc.Component {
         }
     }
 
-    private drawRect(ctx: cc.Graphics, blocks: Array<Block>, color: cc.Color = cc.Color.GREEN) {
-        ctx.clear()
-        for (const block of blocks) {
+    private drawMapMesh() {
+        this.graphicsContainerCom.clear(GraphicsType.MESH)
+
+        for (const block of this.astarGridhMesh.allBlocks) {
             const pos = this.astarGridhMesh.getPosByBlock(block)
-            ctx.rect(pos.x, pos.y, 32, 32)
+
+            switch (block.type) {
+
+                case BlockType.BLOCK:
+                    this.graphicsContainerCom.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(0, 255, 0, 80))
+                    break
+                case BlockType.WALL:
+                    this.graphicsContainerCom.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(255, 0, 0, 80), true)
+                    break
+            }
         }
-        ctx.lineWidth = 5
-        ctx.strokeColor = color
-        ctx.stroke()
     }
 
-    private drawLine(ctx: cc.Graphics, points: Array<cc.Vec2>, color: cc.Color = cc.Color.BLACK) {
+    private outPutMapData() {
+        const content = JSON.stringify(this.mapData, null, "")
+        const fileName = 'mapData.json'
 
-        ctx.moveTo(points[0].x, points[0].y)
-        for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y)
-        }
-        ctx.lineWidth = 5
-        ctx.strokeColor = color
-        ctx.stroke()
-    }
+        const blob = new Blob([content], { type: 'text/json' })
+        const url = URL.createObjectURL(blob)
 
-    private drawTriangle(ctx: cc.Graphics, triangle: Triangle, color: cc.Color = cc.Color.RED) {
-        const vertice1 = triangle.vertices[0]
-        const vertice2 = triangle.vertices[1]
-        const vertice3 = triangle.vertices[2]
-        ctx.moveTo(vertice1.x, vertice1.y)
-        ctx.lineTo(vertice2.x, vertice2.y)
-        ctx.lineTo(vertice3.x, vertice3.y)
-        ctx.lineTo(vertice1.x, vertice1.y)
-        ctx.lineWidth = 5
-        ctx.strokeColor = color
-        ctx.stroke()
+        const link = document.createElement('a')
+        link.href = url
+        link.download = fileName
+
+        document.body.appendChild(link)
+
+        link.click()
+
+        URL.revokeObjectURL(url)
+        document.body.removeChild(link)
     }
 }
+
+
 
 type tileMapData = {
     owningRect: QuadTreeRect,

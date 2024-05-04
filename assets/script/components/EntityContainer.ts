@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:54:52 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-30 15:43:41
+ * @Last Modified time: 2024-05-03 02:06:02
  */
 
 const { ccclass, property } = cc._decorator;
@@ -16,14 +16,10 @@ export default class EntityContainer extends cc.Component {
     @property(cc.Node)
     entity_start: cc.Node = null
 
-    @property(cc.Node)
-    entity_end: cc.Node = null
-
     private entities: Map<string, Entity> = new Map<string, Entity>()
 
     protected start(): void {
         this.addEntity(this.entity_start)
-        this.addEntity(this.entity_end)
     }
 
     protected update(dt: number): void {

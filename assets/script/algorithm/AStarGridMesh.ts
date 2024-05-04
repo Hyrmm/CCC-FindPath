@@ -2,14 +2,14 @@
  * @Author: hyrm 
  * @Date: 2024-04-29 22:47:35 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-30 18:05:54
+ * @Last Modified time: 2024-05-04 15:16:28
  */
 import { GraphMatrix } from "../dataStructure/Graph"
 import { MinHeap, HeapItem } from "../dataStructure/Heap"
 import { getLineFunc } from "../utils/Utils"
 
 
-enum BlockType {
+export enum BlockType {
     BLOCK = 0,
     WALL = 1,
     PATH = 2,
@@ -37,13 +37,6 @@ export class Block implements HeapItem {
     }
 }
 
-export class SeekBlock extends Block {
-    public f: number
-    public g: number
-    public h: number
-    public parent: SeekBlock
-}
-
 
 export class AStarGridMesh {
 
@@ -56,7 +49,7 @@ export class AStarGridMesh {
     private mapHeight: number
 
     private openListMap: Map<Block, Block> = new Map()
-    private openListHeap: MinHeap<SeekBlock> = new MinHeap<SeekBlock>([])
+    private openListHeap: MinHeap<Block> = new MinHeap<Block>([])
     private closeListMap: Map<Block, Block> = new Map()
 
     constructor(mapData: MapData) {
@@ -82,15 +75,20 @@ export class AStarGridMesh {
     }
 
 
-    public findPath(startPos: cc.Vec2, endPos: cc.Vec2): Array<Block> {
-        const endBlock = this.getBlockByPos(endPos)
-        const startBlock = this.getBlockByPos(startPos)
+    public findPath(startPos: cc.Vec2, endPos: cc.Vec2, progress: (block: Block) => void = null): { path: Array<Block>, smoothPath: Array<Block>, collinearPath: Array<Block> } {
+        console.time("FindPath")
+        let endBlock = this.getBlockByPos(endPos)
+        let startBlock = this.getBlockByPos(startPos)
 
 
+        if (endBlock.type !== BlockType.BLOCK) {
+            endBlock = this.getReplacedBlock(endBlock)
+        }
 
-        const hasB = this.hasBarrier(startBlock, endBlock)
-
-        console.log("是否有障碍", hasB)
+        if (endBlock.type !== BlockType.BLOCK) {
+            console.timeEnd("FindPath")
+            return { path: [], smoothPath: [], collinearPath: [] }
+        }
 
         // 初始化,清理上次寻路开启、关闭列表
         this.openListMap = new Map<Block, Block>()
@@ -126,11 +124,16 @@ export class AStarGridMesh {
 
                 this.openListMap.set(block, block)
                 this.openListHeap.push(block)
+                // 寻路记录点
+                if (progress) progress(block)
 
             }
 
             // 开启列表为空，没有通过路径
-            if (this.openListHeap.size === 0) return []
+            if (this.openListHeap.size === 0) {
+                console.timeEnd("FindPath")
+                return { path: [], smoothPath: [], collinearPath: [] }
+            }
 
             // 从 openList 中找到 f 值最小的 block,放入 closeList，并从 openList 中删除，并设置为 targetBlock
             curSeekBlock = this.openListHeap.pop()
@@ -139,7 +142,7 @@ export class AStarGridMesh {
             if (curSeekBlock === endBlock) {
 
                 // 回溯路径
-                const path: Array<SeekBlock> = []
+                const path: Array<Block> = []
                 let curRecallBlock = curSeekBlock
 
                 while (curRecallBlock !== startBlock) {
@@ -147,7 +150,11 @@ export class AStarGridMesh {
                     curRecallBlock = curRecallBlock.parent
                 }
 
-                return path.reverse()
+
+                const smoothPath = this.smoothingPath([startBlock].concat(path.concat().reverse()))
+                
+                console.timeEnd("FindPath")
+                return { path: path, smoothPath: smoothPath.smoothRes, collinearPath: smoothPath.collinearRes }
             }
         }
     }
@@ -158,18 +165,17 @@ export class AStarGridMesh {
     * @returns
     */
     public getNeighbors(block: Block): Array<Block> {
-        const leftTop = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x - 1] : undefined
-        const top = this.blocks[block.y + 1] ? this.blocks[block.y + 1][block.x] : undefined
-        const rightTop = this.blocks[block.y + 1] ? this.blocks[block.y + 1][block.x + 1] : undefined
-
         const left = this.blocks[block.y][block.x - 1]
         const right = this.blocks[block.y][block.x + 1]
-
-        const leftBottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x - 1] : undefined
+        const top = this.blocks[block.y + 1] ? this.blocks[block.y + 1][block.x] : undefined
         const bottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x] : undefined
+
+        const leftTop = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x - 1] : undefined
+        const rightTop = this.blocks[block.y + 1] ? this.blocks[block.y + 1][block.x + 1] : undefined
+        const leftBottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x - 1] : undefined
         const rightBottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x + 1] : undefined
 
-        return [leftTop, top, rightTop, left, right, leftBottom, bottom, rightBottom]
+        return [leftTop, rightTop, leftBottom, rightBottom, top, left, right, bottom]
     }
 
     /**
@@ -206,9 +212,9 @@ export class AStarGridMesh {
     public getBlockByPosExt(pos: cc.Vec2): Array<Block> {
         const result: Array<Block> = []
 
+        // 注意:向下取整，点共享多个block时，默认归属上或右的block
         const blockX = Math.floor((this.mapWidth / 2 + pos.x) / this.blockWidth)
         const blockY = Math.floor((this.mapHeight / 2 + pos.y) / this.blockHeight)
-
 
         const xIsInt = pos.x % this.blockWidth == 0
         const yIsInt = pos.y % this.blockHeight == 0
@@ -223,12 +229,12 @@ export class AStarGridMesh {
         else if (xIsInt && !yIsInt) {
             // 左右俩点共享
             result[0] = this.blocks[blockY][blockX]
-            result[1] = this.blocks[blockY][blockX + 1]
+            result[1] = this.blocks[blockY][blockX - 1]
         }
         else if (!xIsInt && yIsInt) {
             // 上下俩点共享
             result[0] = this.blocks[blockY][blockX]
-            result[1] = this.blocks[blockY + 1][blockX]
+            result[1] = this.blocks[blockY - 1][blockX]
         }
         else {
             // 单点共享
@@ -238,8 +244,51 @@ export class AStarGridMesh {
         return result
     }
 
-    public getAllBlocks(): Array<Block> {
-        return this.blocks.flat()
+    /**
+     * 获取可通过的替代block
+     * @param block 
+     * @returns 
+     */
+    public getReplacedBlock(block: Block): Block {
+        let maxDepth = 10
+        let result: Block = block
+        for (let dep = 1; dep <= maxDepth; dep++) {
+
+            // 左
+            const l = this.blocks[block.y][block.x - dep]
+            if (l && l.type === BlockType.BLOCK) return l
+
+            // 右
+            const r = this.blocks[block.y][block.x + dep]
+            if (r && r.type === BlockType.BLOCK) return r
+
+            // 上
+            const t = this.blocks[block.y + dep] ? this.blocks[block.y + dep][block.x] : null
+            if (t && t.type === BlockType.BLOCK) return t
+
+            // 下
+            const b = this.blocks[block.y - dep] ? this.blocks[block.y - dep][block.x] : null
+            if (b && b.type === BlockType.BLOCK) return b
+
+            // 左上
+            const lt = this.blocks[block.y + dep] ? this.blocks[block.y + dep][block.x - dep] : null
+            if (lt && lt.type === BlockType.BLOCK) return lt
+
+            // 右上
+            const rt = this.blocks[block.y + dep] ? this.blocks[block.y + dep][block.x + dep] : null
+            if (rt && rt.type === BlockType.BLOCK) return rt
+
+            // 左下
+            const lb = this.blocks[block.y - dep] ? this.blocks[block.y - dep][block.x - dep] : null
+            if (lb && lb.type === BlockType.BLOCK) return lb
+
+            // 右下
+            const rb = this.blocks[block.y - dep] ? this.blocks[block.y - dep][block.x + dep] : null
+            if (rb && rb.type === BlockType.BLOCK) return rb
+        }
+
+        return result
+
     }
 
     /**
@@ -251,10 +300,10 @@ export class AStarGridMesh {
     private static calcHeuristicDistance(block1: Block, block2: Block): number {
 
         //曼哈顿距离
-        return Math.abs(block1.x - block2.x) + Math.abs(block1.y - block2.y)
+        // return Math.abs(block1.x - block2.x) + Math.abs(block1.y - block2.y)
 
         // 欧几里得距离
-        // return Math.sqrt((block1.x - block2.x) ** 2 + (block1.y - block2.y) ** 2)
+        return Math.sqrt((block1.x - block2.x) ** 2 + (block1.y - block2.y) ** 2)
 
         // 对角线距离
         // return Math.max(Math.abs(block1.x - block2.x), Math.abs(block1.y - block2.y))
@@ -278,7 +327,8 @@ export class AStarGridMesh {
 
     /**
      * 判断两节点之间是否存在障碍物 
-     * 
+     * @param startBlock 
+     * @param endBlock 
      */
     public hasBarrier(startBlock: Block, endBlock: Block): boolean {
 
@@ -332,16 +382,61 @@ export class AStarGridMesh {
 
     }
 
+    /**
+     * 路径平滑处理，合并共线点，去除拐点
+     */
+    public smoothingPath(path: Array<Block>): { collinearRes: Array<Block>, smoothRes: Array<Block> } {
+        let len
 
+        // 合并共线点
+        const collinearRes: Array<Block> = path.concat()
+        len = collinearRes.length
+
+        if (len > 2) {
+            let vector1 = cc.v2(collinearRes[len - 1].x, collinearRes[len - 1].y).sub(cc.v2(collinearRes[len - 2].x, collinearRes[len - 2].y))
+            for (let i = len - 3; i >= 0; i--) {
+                const vector2 = cc.v2(collinearRes[i + 1].x, collinearRes[i + 1].y).sub(cc.v2(collinearRes[i].x, collinearRes[i].y))
+
+                if (vector1.cross(vector2) == 0) {
+                    collinearRes.splice(i + 1, 1)
+                } else {
+                    vector1 = vector2
+                }
+
+            }
+        }
+
+        // 去除拐点
+        len = collinearRes.length
+        const smoothRes: Array<Block> = [collinearRes[len - 1]]
+        let i = len - 1
+
+        while (i > 0) {
+            let flag = false
+            let curBlock = collinearRes[i]
+            for (let j = 0; j <= i - 1; j++) {
+
+                if (!this.hasBarrier(curBlock, collinearRes[j])) {
+                    smoothRes.push(collinearRes[j])
+                    i = j
+                    flag = true
+                    break
+                }
+
+            }
+
+            if (!flag) i--
+            if (!flag && i != len - 1) smoothRes.push(collinearRes[i])
+        }
+
+        return { collinearRes: collinearRes, smoothRes: smoothRes }
+    }
+
+    public get allBlocks(): Array<Block> {
+        return this.blocks.reduce((acc, curr) => acc.concat(curr), [])
+    }
 }
 
 
 
 
-export type MapData = {
-    mapWidth: number,
-    mapHeight: number,
-    nodeWidth: number,
-    nodeHeight: number,
-    roadDataArr: number[][],
-}
