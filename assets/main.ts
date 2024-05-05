@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-05 00:48:08
+ * @Last Modified time: 2024-05-05 16:56:33
  */
 
 const { ccclass, property } = cc._decorator
@@ -273,6 +273,27 @@ export default class Main extends cc.Component {
                     this.graphicsContainerCom.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(255, 0, 0, 80), true)
                     break
             }
+        }
+
+        // 战争迷雾地图块
+        for (let i = 1; i < this.mapOriSize.width / 128; i++) {
+            const startX = i * 128 - this.mapOriSize.width / 2
+            const startY = this.mapOriSize.height / 2
+
+            const endX = i * 128 - this.mapOriSize.width / 2
+            const endY = -this.mapOriSize.height / 2
+
+            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.BLUE)
+
+        }
+
+        for (let i = 1; i < this.mapOriSize.height / 128; i++) {
+            const startX = -this.mapOriSize.width / 2
+            const startY = i * 128 - this.mapOriSize.height / 2
+            const endX = this.mapOriSize.width / 2
+            const endY = i * 128 - this.mapOriSize.height / 2
+
+            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.BLUE)
         }
     }
 
