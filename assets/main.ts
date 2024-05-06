@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-06 18:28:38
+ * @Last Modified time: 2024-05-07 00:26:17
  */
 
 const { ccclass, property } = cc._decorator
@@ -10,6 +10,8 @@ import { QuadTree, QuadTreeRect } from './script/dataStructure/QuadTree'
 import EntityContainer from './script/components/EntityContainer'
 import { AStarGridMesh, Block, BlockType } from "./script/algorithm/AStarGridMesh"
 import GraphicsContainer, { GraphicsType } from './script/components/GraphicsContainer'
+import FovContainer from './script/components/FovContainer'
+import MapContainer from './script/components/MapContainer'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -42,38 +44,35 @@ export default class Main extends cc.Component {
 
     private entityContainerCom: EntityContainer
     private graphicsContainerCom: GraphicsContainer
+    private fovContainerCom: FovContainer
+    private mapContainerCom: MapContainer
 
     private isEditing: boolean = false
     private editingBlock: BlockType = BlockType.BLOCK
     private isTouchMoving: boolean = false
 
-    private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
-    private mapTileSize: { width: number, height: number } = { width: 1024 * 7 / 16, height: 1024 * 4 / 16 }
-    private mapQuadTree: QuadTree<tileMapData> = null
-    private mapQuadSize: number = 16
-
-    private fovTileSize: { width: number, height: number } = { width: 128, height: 128 }
-    private fovQuadTree: QuadTree<fovTileData> = null
-    private fovQuadSize: number = 56
-
     private mapData: MapData = null
     private astarGridhMesh: AStarGridMesh = null
 
+    private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
     protected start() {
+
+        this.mapContainerCom = this.map_container.getComponent(MapContainer)
+        this.fovContainerCom = this.fov_container.getComponent(FovContainer)
         this.entityContainerCom = this.entity_container.getComponent(EntityContainer)
         this.graphicsContainerCom = this.graphics_container.getComponent(GraphicsContainer)
 
-        // 地图四叉树初始化(用于动态加载可视区域显示地图)
+        // 地图四叉树
         console.time("MapQuadTree")
-        this.initMapQuadTree()
+        this.mapContainerCom.initMapQuadTree(this.mapOriSize)
         console.timeEnd("MapQuadTree")
 
-        // 迷雾四叉树初始化(用于动态加载显示战争迷雾)
+        // 迷雾四叉树
         console.time("FovQuadTree")
-        this.initFovQuadTree()
+        this.fovContainerCom.initFovQuadTree(this.mapOriSize)
         console.timeEnd("FovQuadTree")
 
-        // 寻路网格初始化(用于寻路算法)
+        // AStar寻路网格
         console.time("astarGridMesh")
         this.initAStarGridMesh()
         console.timeEnd("astarGridMesh")
@@ -82,87 +81,12 @@ export default class Main extends cc.Component {
         this.initEventListener()
 
         // 首次地图可视范围更新
-        this.updateViewPortMapTileNodes()
-
+        this.scheduleOnce(this.updateViewPortMapTileNodes.bind(this), 0.1)
     }
 
-
-
-    private initMapQuadTree() {
-
-        const boundsPosX = -this.mapOriSize.width / 2
-        const boundsPosY = -this.mapOriSize.height / 2
-        const boundsWidth = this.mapOriSize.width
-        const boundsHeight = this.mapOriSize.height
-
-        const rootBounds: QuadTreeRect = { x: boundsPosX, y: boundsPosY, width: boundsWidth, height: boundsHeight }
-        this.mapQuadTree = new QuadTree<tileMapData>(rootBounds, 4)
-
-        for (let i = 0; i < Math.pow(this.mapQuadSize, 2); i++) {
-
-            const rows = Math.floor(i / this.mapQuadSize) + 1
-            const cols = i % this.mapQuadSize + 1
-
-            // 建立基于地图节点相对地图块坐标
-            const tileNode = new cc.Node(`tile_${i}`)
-            const halfTileWidth = this.mapTileSize.width / 2
-            const halfTileHeight = this.mapTileSize.height / 2
-            const tilePosX = cols <= this.mapQuadSize / 2 ? -((this.mapQuadSize / 2 - cols) * this.mapTileSize.width + halfTileWidth) : (cols - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.width + halfTileWidth
-            const tilePosY = rows <= this.mapQuadSize / 2 ? (this.mapQuadSize / 2 - rows) * this.mapTileSize.height + halfTileHeight : -((rows - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.height + halfTileHeight)
-            tileNode.setPosition(tilePosX, tilePosY)
-            tileNode.setAnchorPoint(0.5, 0.5)
-            this.map_container.addChild(tileNode)
-
-            // 建立基于世界坐标碰撞矩形
-            const tileBoundsX = this.mapQuadTree.bounds.x + (cols - 1) * this.mapTileSize.width
-            const tileBoundsY = this.mapQuadTree.bounds.y + (this.mapQuadSize - 1 - (rows - 1)) * this.mapTileSize.height
-            const tileRect: QuadTreeRect = { x: tileBoundsX, y: tileBoundsY, width: this.mapTileSize.width, height: this.mapTileSize.height }
-            const quadTreeObject: tileMapData = { owningRect: tileRect, node: tileNode }
-
-            // 绑定碰撞矩形和地图块节点插入四叉树中
-            this.mapQuadTree.insert(tileRect, quadTreeObject)
-        }
-    }
-
-    private initFovQuadTree() {
-        const boundsPosX = -this.mapOriSize.width / 2
-        const boundsPosY = -this.mapOriSize.height / 2
-        const boundsWidth = this.mapOriSize.width
-        const boundsHeight = this.mapOriSize.height
-
-        const rootBounds: QuadTreeRect = { x: boundsPosX, y: boundsPosY, width: boundsWidth, height: boundsHeight }
-        this.fovQuadTree = new QuadTree<tileMapData>(rootBounds, 4)
-
-
-        for (let i = 0; i < Math.pow(this.fovQuadSize, 2); i++) {
-
-            const rows = Math.floor(i / this.fovQuadSize) + 1
-            const cols = i % this.fovQuadSize + 1
-
-            // 建立基于地图节点相对地图块坐标
-            const tileNode = new cc.Node(`tile_${i}`)
-            const halfTileWidth = this.fovTileSize.width / 2
-            const halfTileHeight = this.fovTileSize.height / 2
-            const tilePosX = cols <= this.fovQuadSize / 2 ? -((this.fovQuadSize / 2 - cols) * this.fovTileSize.width + halfTileWidth) : (cols - (this.fovQuadSize / 2 + 1)) * this.fovTileSize.width + halfTileWidth
-            const tilePosY = rows <= this.fovQuadSize / 2 ? (this.fovQuadSize / 2 - rows) * this.fovTileSize.height + halfTileHeight : -((rows - (this.fovQuadSize / 2 + 1)) * this.fovTileSize.height + halfTileHeight)
-            tileNode.setPosition(tilePosX, tilePosY)
-            tileNode.setAnchorPoint(0.5, 0.5)
-            this.fov_container.addChild(tileNode)
-
-            // 建立基于世界坐标碰撞矩形
-            const tileBoundsX = this.fovQuadTree.bounds.x + (cols - 1) * this.fovTileSize.width
-            const tileBoundsY = this.fovQuadTree.bounds.y + (this.fovQuadSize - 1 - (rows - 1)) * this.fovTileSize.height
-            const tileRect: QuadTreeRect = { x: tileBoundsX, y: tileBoundsY, width: this.fovTileSize.width, height: this.fovTileSize.height }
-            const quadTreeObject: tileMapData = { owningRect: tileRect, node: tileNode }
-
-            // 绑定碰撞矩形和地图块节点插入四叉树中
-            this.fovQuadTree.insert(tileRect, quadTreeObject)
-        }
-    }
 
     private initAStarGridMesh() {
         cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
-
             this.mapData = data.json as MapData
             this.astarGridhMesh = new AStarGridMesh(data.json as MapData)
             this.drawMapMesh()
@@ -309,7 +233,7 @@ export default class Main extends cc.Component {
         const viewportRect: QuadTreeRect = { x: viewportBoundX, y: viewportBoundY, width: this.viewPort.width, height: this.viewPort.height }
 
         // 判断视口与地图四叉树碰撞
-        const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(viewportRect)
+        const visiableTileObjects: tileMapData[] = this.mapContainerCom.retrieve(viewportRect)
 
         // 动态显示可视区域地图块节点
         this.map_container.children.forEach((node: cc.Node) => node.active = false)
@@ -322,6 +246,12 @@ export default class Main extends cc.Component {
                 tileObject.node.addComponent(cc.Sprite).spriteFrame = spriteFrame
             })
         }
+
+        console.time("fov")
+        const visiableFovObjects: fovTileData[] = this.fovContainerCom.retrieve(viewportRect)
+        console.timeEnd("fov")
+        console.log(visiableFovObjects)
+
     }
 
     private drawMapMesh() {
@@ -342,22 +272,22 @@ export default class Main extends cc.Component {
         }
 
         // 战争迷雾地图块
-        for (let i = 1; i < this.mapOriSize.width / 128; i++) {
-            const startX = i * 128 - this.mapOriSize.width / 2
+        for (let i = 1; i < this.mapOriSize.width / 256; i++) {
+            const startX = i * 256 - this.mapOriSize.width / 2
             const startY = this.mapOriSize.height / 2
 
-            const endX = i * 128 - this.mapOriSize.width / 2
+            const endX = i * 256 - this.mapOriSize.width / 2
             const endY = -this.mapOriSize.height / 2
 
             this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.GRAY)
 
         }
 
-        for (let i = 1; i < this.mapOriSize.height / 128; i++) {
+        for (let i = 1; i < this.mapOriSize.height / 256; i++) {
             const startX = -this.mapOriSize.width / 2
-            const startY = i * 128 - this.mapOriSize.height / 2
+            const startY = i * 256 - this.mapOriSize.height / 2
             const endX = this.mapOriSize.width / 2
-            const endY = i * 128 - this.mapOriSize.height / 2
+            const endY = i * 256 - this.mapOriSize.height / 2
 
             this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.GRAY)
         }
