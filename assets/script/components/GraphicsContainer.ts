@@ -36,6 +36,15 @@ export default class GraphicsContainer extends cc.Component {
         ctx.stroke()
     }
 
+    public drawFov(type: GraphicsType, rect: cc.Rect) {
+        const ctx = this.graphics[type]
+        // ctx.circle(rect.x + rect.width / 2, rect.y + rect.height / 2, Math.sqrt(rect.width ** 2 + rect.height ** 2) / 2)
+        ctx.roundRect(rect.x, rect.y, 46, 46, 60)
+        ctx.fillColor = cc.color(0, 0, 0, 255)
+        ctx.fill()
+        
+    }
+
     public clear(type: GraphicsType) {
         const ctx = this.graphics[type]
         ctx.clear()
@@ -45,5 +54,6 @@ export default class GraphicsContainer extends cc.Component {
 
 export enum GraphicsType {
     MESH = 0,
-    PATH = 1
+    PATH = 1,
+    WARFOV = 2
 }
