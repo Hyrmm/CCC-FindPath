@@ -2,16 +2,8 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:47 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-06 22:13:19
+ * @Last Modified time: 2024-05-07 18:09:49
  */
-
-export enum BoundaryType {
-    LEFT_TOP,
-    RIGHT_TOP,
-    LEFT_BOTTOM,
-    RIGHT_BOTTOM
-}
-
 export class QuadTree<T extends QuadTreeObject> {
     public bounds: QuadTreeRect
 
@@ -23,16 +15,18 @@ export class QuadTree<T extends QuadTreeObject> {
     private children: Array<QuadTree<T>> = []
 
 
-    private dirStr: string = "root"
+    public dirStr: string = "root"
+    public dirNum: QuadTreeDir = QuadTreeDir.ROOT
     /**
      * @param level 当前区域深度
      * @param bounds 当前区域包围盒范围
      * @param max_objects 当前区域存放的最大对象数量,超过该数量则分裂
      * @param max_levels 整个四叉树的最大深度,超过该深度则不再分裂
      */
-    constructor(bounds: QuadTreeRect, max_objects: number, max_levels?: number, level?: number, dirStr?: string) {
+    constructor(bounds: QuadTreeRect, max_objects: number, max_levels?: number, level?: number, dirStr?: string, dirNum?: number) {
         this.bounds = bounds
         this.dirStr = dirStr || this.dirStr
+        this.dirNum = dirNum || this.dirNum
         this.level = level || this.level
         this.max_levels = max_levels || this.max_levels
         this.max_objects = max_objects || this.max_objects
@@ -90,7 +84,7 @@ export class QuadTree<T extends QuadTreeObject> {
             y: this.bounds.y + subHeight,
             width: subWidth,
             height: subHeight
-        }, this.max_objects, this.max_levels, this.level + 1, "左上")
+        }, this.max_objects, this.max_levels, this.level + 1, "左上", QuadTreeDir.LEFT_TOP)
 
 
         // 右上
@@ -99,7 +93,7 @@ export class QuadTree<T extends QuadTreeObject> {
             y: this.bounds.y + subHeight,
             width: subWidth,
             height: subHeight
-        }, this.max_objects, this.max_levels, this.level + 1, "右上")
+        }, this.max_objects, this.max_levels, this.level + 1, "右上", QuadTreeDir.RIGHT_TOP)
 
         // 左下
         this.children[2] = new QuadTree({
@@ -107,7 +101,7 @@ export class QuadTree<T extends QuadTreeObject> {
             y: this.bounds.y,
             width: subWidth,
             height: subHeight
-        }, this.max_objects, this.max_levels, this.level + 1, "坐下")
+        }, this.max_objects, this.max_levels, this.level + 1, "坐下", QuadTreeDir.LEFT_BOTTOM)
 
         // 右下
         this.children[3] = new QuadTree({
@@ -115,7 +109,7 @@ export class QuadTree<T extends QuadTreeObject> {
             y: this.bounds.y,
             width: subWidth,
             height: subHeight
-        }, this.max_objects, this.max_levels, this.level + 1, "右下")
+        }, this.max_objects, this.max_levels, this.level + 1, "右下", QuadTreeDir.RIGHT_BOTTOM)
     }
 
     /**
@@ -141,12 +135,34 @@ export class QuadTree<T extends QuadTreeObject> {
     }
 
     /**
+    * 查询所有与矩形范围重叠内的对象 
+    * @param rect 矩形范围
+    */
+    public retrieveExt(rect: QuadTreeRect): Array<QuadTree<T>> {
+
+        let returnObjects = this.objects.length ? [this as QuadTree<T>] : []
+        const indexes = this.getBelongIndex(rect)
+
+        // 如果有子节点，则递归查找
+        if (this.children.length) {
+            for (const index of indexes) {
+                returnObjects = returnObjects.concat(this.children[index].retrieveExt(rect))
+            }
+        }
+
+        // 对象可能存在重叠，所以需要去重
+        returnObjects = returnObjects.filter((item, index) => returnObjects.indexOf(item) >= index)
+
+        return returnObjects
+    }
+
+    /**
      * 获取矩形所属的节点索引
      * @param rect 矩形范围
      * @returns 节点索引数组
      */
     public getBelongIndex(rect: QuadTreeRect): Array<number> {
-        
+
         // 可能同时与多个节点重叠，所以返回多个节点的索引
         const indexes: Array<number> = []
 
@@ -161,22 +177,22 @@ export class QuadTree<T extends QuadTreeObject> {
 
         // 左下
         if (startIsInLeft && !startIsInTop) {
-            indexes.push(2)
+            indexes.push(QuadTreeDir.LEFT_BOTTOM)
         }
 
         // 右上
         if (endIsInRight && !endIsinBottom) {
-            indexes.push(1)
+            indexes.push(QuadTreeDir.RIGHT_TOP)
         }
 
         // 左上
         if (startIsInLeft && !endIsinBottom) {
-            indexes.push(0)
+            indexes.push(QuadTreeDir.LEFT_TOP)
         }
 
         // 右下
         if (!startIsInTop && endIsInRight) {
-            indexes.push(3)
+            indexes.push(QuadTreeDir.RIGHT_BOTTOM)
         }
 
 
@@ -184,6 +200,20 @@ export class QuadTree<T extends QuadTreeObject> {
         return indexes
     }
 
+    public getObjects(): Array<T> {
+        return this.objects
+    }
+
+    public getChildren(): Array<QuadTree<T>> {
+        return this.children
+    }
+}
+export enum QuadTreeDir {
+    ROOT = -1,
+    LEFT_TOP = 0,
+    RIGHT_TOP = 1,
+    LEFT_BOTTOM = 2,
+    RIGHT_BOTTOM = 3
 }
 
 export type QuadTreeRect = {

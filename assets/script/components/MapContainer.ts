@@ -19,6 +19,9 @@ export default class MapContainer extends cc.Component {
         const boundsWidth = mapOriSize.width
         const boundsHeight = mapOriSize.height
 
+        const halfTileWidth = this.mapTileSize.width / 2
+        const halfTileHeight = this.mapTileSize.height / 2
+
         const rootBounds: QuadTreeRect = { x: boundsPosX, y: boundsPosY, width: boundsWidth, height: boundsHeight }
         this.mapQuadTree = new QuadTree<tileMapData>(rootBounds, 4)
 
@@ -29,10 +32,8 @@ export default class MapContainer extends cc.Component {
 
             // 建立基于地图节点相对地图块坐标
             const tileNode = new cc.Node(`tile_${i}`)
-            const halfTileWidth = this.mapTileSize.width / 2
-            const halfTileHeight = this.mapTileSize.height / 2
-            const tilePosX = cols <= this.mapQuadSize / 2 ? -((this.mapQuadSize / 2 - cols) * this.mapTileSize.width + halfTileWidth) : (cols - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.width + halfTileWidth
-            const tilePosY = rows <= this.mapQuadSize / 2 ? (this.mapQuadSize / 2 - rows) * this.mapTileSize.height + halfTileHeight : -((rows - (this.mapQuadSize / 2 + 1)) * this.mapTileSize.height + halfTileHeight)
+            const tilePosX = -mapOriSize.width / 2 + (cols - 1) * this.mapTileSize.width + halfTileWidth
+            const tilePosY = -mapOriSize.height / 2 + (this.mapQuadSize - rows) * this.mapTileSize.height + halfTileHeight
             tileNode.setPosition(tilePosX, tilePosY)
             tileNode.setAnchorPoint(0.5, 0.5)
             this.node.addChild(tileNode)
@@ -51,6 +52,24 @@ export default class MapContainer extends cc.Component {
     public retrieve(rect: QuadTreeRect) {
         return this.mapQuadTree.retrieve(rect)
     }
+
+    public updateVisableTiles(rect: QuadTreeRect) {
+        // 判断视口与地图四叉树碰撞
+        const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(rect)
+
+        // 动态显示可视区域地图块节点
+        this.node.children.forEach((node: cc.Node) => node.active = false)
+
+        for (const tileObject of visiableTileObjects) {
+            tileObject.node.active = true
+            if (tileObject.node.getComponent(cc.Sprite)) continue
+
+            cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
+                tileObject.node.addComponent(cc.Sprite).spriteFrame = spriteFrame
+            })
+        }
+    }
+
 
 }
 

@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-07 00:26:17
+ * @Last Modified time: 2024-05-07 18:01:29
  */
 
 const { ccclass, property } = cc._decorator
@@ -81,7 +81,7 @@ export default class Main extends cc.Component {
         this.initEventListener()
 
         // 首次地图可视范围更新
-        this.scheduleOnce(this.updateViewPortMapTileNodes.bind(this), 0.1)
+        this.scheduleOnce(this.updateVisibleTiles.bind(this), 0.1)
     }
 
 
@@ -108,15 +108,17 @@ export default class Main extends cc.Component {
                 this.map_container.x = changePosX
                 this.entity_container.x = changePosX
                 this.graphics_container.x = changePosX
+                this.fov_container.x = changePosX
             }
 
             if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
                 this.map_container.y = changePosY
                 this.entity_container.y = changePosY
                 this.graphics_container.y = changePosY
+                this.fov_container.y = changePosY
             }
 
-            this.updateViewPortMapTileNodes()
+            this.updateVisibleTiles()
 
         }, this)
 
@@ -192,6 +194,42 @@ export default class Main extends cc.Component {
             // const blockPos = this.astarGridhMesh.getPosByBlock(block)
             // this.graphicsContainerCom.drawFov(GraphicsType.WARFOV, cc.rect(blockPos.x, blockPos.y, 32, 32))
 
+            // 迷雾瓦片
+            const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
+            const rect: QuadTreeRect = { x: mapPos.x, y: mapPos.y, width: 32, height: 32 }
+            const result = this.fovContainerCom.retrieveExt(rect)
+
+            if (result.length == 1) {
+                for (const [dirIndex, fovTileData] of result[0].getObjects().entries()) {
+                    switch (dirIndex) {
+                        case 0:
+                            fovTileData.value = 1
+                            break
+                        case 1:
+                            fovTileData.value = 2
+                            break
+                        case 2:
+                            fovTileData.value = 4
+                            break
+                        case 3:
+                            fovTileData.value = 8
+                            break
+                    }
+                }
+
+            }
+
+            if (result.length == 2) {
+                
+            }
+
+
+
+            this.updateVisibleTiles()
+
+            console.log(result)
+
+
             this.isTouchMoving = false
         }, this)
 
@@ -225,32 +263,21 @@ export default class Main extends cc.Component {
 
     }
 
-    private updateViewPortMapTileNodes() {
+    private updateVisibleTiles() {
 
         // 计算视口矩形
         const viewportBoundX = (0 - this.viewPort.width / 2) - this.map_container.x
         const viewportBoundY = (0 - this.viewPort.height / 2) - this.map_container.y
         const viewportRect: QuadTreeRect = { x: viewportBoundX, y: viewportBoundY, width: this.viewPort.width, height: this.viewPort.height }
 
-        // 判断视口与地图四叉树碰撞
-        const visiableTileObjects: tileMapData[] = this.mapContainerCom.retrieve(viewportRect)
+        console.time("update:mapTile")
+        this.mapContainerCom.updateVisableTiles(viewportRect)
+        console.timeEnd("update:mapTile")
 
-        // 动态显示可视区域地图块节点
-        this.map_container.children.forEach((node: cc.Node) => node.active = false)
+        console.time("update:fovTile")
+        this.fovContainerCom.updateVisableTiles(viewportRect)
+        console.timeEnd("update:fovTile")
 
-        for (const tileObject of visiableTileObjects) {
-            tileObject.node.active = true
-            if (tileObject.node.getComponent(cc.Sprite)) continue
-
-            cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
-                tileObject.node.addComponent(cc.Sprite).spriteFrame = spriteFrame
-            })
-        }
-
-        console.time("fov")
-        const visiableFovObjects: fovTileData[] = this.fovContainerCom.retrieve(viewportRect)
-        console.timeEnd("fov")
-        console.log(visiableFovObjects)
 
     }
 
@@ -272,24 +299,24 @@ export default class Main extends cc.Component {
         }
 
         // 战争迷雾地图块
-        for (let i = 1; i < this.mapOriSize.width / 256; i++) {
-            const startX = i * 256 - this.mapOriSize.width / 2
+        for (let i = 1; i < this.mapOriSize.width / 224; i++) {
+            const startX = i * 224 - this.mapOriSize.width / 2
             const startY = this.mapOriSize.height / 2
 
-            const endX = i * 256 - this.mapOriSize.width / 2
+            const endX = i * 224 - this.mapOriSize.width / 2
             const endY = -this.mapOriSize.height / 2
 
-            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.GRAY)
+            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.ORANGE)
 
         }
 
-        for (let i = 1; i < this.mapOriSize.height / 256; i++) {
+        for (let i = 1; i < this.mapOriSize.height / 128; i++) {
             const startX = -this.mapOriSize.width / 2
-            const startY = i * 256 - this.mapOriSize.height / 2
+            const startY = i * 128 - this.mapOriSize.height / 2
             const endX = this.mapOriSize.width / 2
-            const endY = i * 256 - this.mapOriSize.height / 2
+            const endY = i * 128 - this.mapOriSize.height / 2
 
-            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.GRAY)
+            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.ORANGE)
         }
 
         // this.graphicsContainerCom.drawRect(GraphicsType.WARFOV, cc.rect(-this.mapOriSize.width / 2, -this.mapOriSize.height / 2, this.mapOriSize.width, this.mapOriSize.height), cc.color(0, 0, 0, 150), true)
@@ -314,16 +341,3 @@ export default class Main extends cc.Component {
         document.body.removeChild(link)
     }
 }
-
-
-
-type tileMapData = {
-    owningRect: QuadTreeRect,
-    node: cc.Node
-}
-
-type fovTileData = {
-    owningRect: QuadTreeRect,
-    node: cc.Node,
-}
-
