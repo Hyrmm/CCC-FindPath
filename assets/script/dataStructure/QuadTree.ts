@@ -11,8 +11,8 @@ export class QuadTree<T extends QuadTreeObject> {
     private max_levels: number = 16
     private max_objects: number = 10
 
-    private objects: Array<T> = []
-    private children: Array<QuadTree<T>> = []
+    private _objects: Array<T> = []
+    private _children: Array<QuadTree<T>> = []
 
 
     public dirStr: string = "root"
@@ -40,35 +40,35 @@ export class QuadTree<T extends QuadTreeObject> {
     public insert(rect: QuadTreeRect, obj: T) {
 
         // 如果有子节点，则插入到子节点中
-        if (this.children.length) {
+        if (this._children.length) {
             const indexes = this.getBelongIndex(rect)
             for (const index of indexes) {
-                this.children[index].insert(rect, obj)
+                this._children[index].insert(rect, obj)
             }
             return
         }
 
 
         // 如果没有子节点，则插入到当前节点中
-        this.objects.push(obj)
+        this._objects.push(obj)
 
         // 插入对象后，如果对象数量超过最大数量，则分裂
-        if (this.objects.length >= this.max_objects && this.level < this.max_levels) {
+        if (this._objects.length >= this.max_objects && this.level < this.max_levels) {
 
-            if (!this.children.length) {
+            if (!this._children.length) {
                 this.subdivide()
             }
 
             // 把原有对象分散插入到新分裂子节点中
-            for (const obj of this.objects) {
+            for (const obj of this._objects) {
                 const indexes = this.getBelongIndex(obj.owningRect)
                 for (const index of indexes) {
-                    this.children[index].insert(obj.owningRect, obj)
+                    this._children[index].insert(obj.owningRect, obj)
                 }
             }
 
             // 清空当前节点的对象
-            this.objects = []
+            this._objects = []
         }
     }
 
@@ -79,7 +79,7 @@ export class QuadTree<T extends QuadTreeObject> {
         const subWidth = this.bounds.width / 2
         const subHeight = this.bounds.height / 2
         // 左上
-        this.children[0] = new QuadTree({
+        this._children[0] = new QuadTree({
             x: this.bounds.x,
             y: this.bounds.y + subHeight,
             width: subWidth,
@@ -88,7 +88,7 @@ export class QuadTree<T extends QuadTreeObject> {
 
 
         // 右上
-        this.children[1] = new QuadTree({
+        this._children[1] = new QuadTree({
             x: this.bounds.x + subWidth,
             y: this.bounds.y + subHeight,
             width: subWidth,
@@ -96,15 +96,15 @@ export class QuadTree<T extends QuadTreeObject> {
         }, this.max_objects, this.max_levels, this.level + 1, "右上", QuadTreeDir.RIGHT_TOP)
 
         // 左下
-        this.children[2] = new QuadTree({
+        this._children[2] = new QuadTree({
             x: this.bounds.x,
             y: this.bounds.y,
             width: subWidth,
             height: subHeight
-        }, this.max_objects, this.max_levels, this.level + 1, "坐下", QuadTreeDir.LEFT_BOTTOM)
+        }, this.max_objects, this.max_levels, this.level + 1, "左下", QuadTreeDir.LEFT_BOTTOM)
 
         // 右下
-        this.children[3] = new QuadTree({
+        this._children[3] = new QuadTree({
             x: this.bounds.x + subWidth,
             y: this.bounds.y,
             width: subWidth,
@@ -118,13 +118,13 @@ export class QuadTree<T extends QuadTreeObject> {
      */
     public retrieve(rect: QuadTreeRect): Array<T> {
 
-        let returnObjects = this.objects
+        let returnObjects = this._objects
         const indexes = this.getBelongIndex(rect)
 
         // 如果有子节点，则递归查找
-        if (this.children.length) {
+        if (this._children.length) {
             for (const index of indexes) {
-                returnObjects = returnObjects.concat(this.children[index].retrieve(rect))
+                returnObjects = returnObjects.concat(this._children[index].retrieve(rect))
             }
         }
 
@@ -140,13 +140,13 @@ export class QuadTree<T extends QuadTreeObject> {
     */
     public retrieveExt(rect: QuadTreeRect): Array<QuadTree<T>> {
 
-        let returnObjects = this.objects.length ? [this as QuadTree<T>] : []
+        let returnObjects = this._objects.length ? [this as QuadTree<T>] : []
         const indexes = this.getBelongIndex(rect)
 
         // 如果有子节点，则递归查找
-        if (this.children.length) {
+        if (this._children.length) {
             for (const index of indexes) {
-                returnObjects = returnObjects.concat(this.children[index].retrieveExt(rect))
+                returnObjects = returnObjects.concat(this._children[index].retrieveExt(rect))
             }
         }
 
@@ -200,12 +200,13 @@ export class QuadTree<T extends QuadTreeObject> {
         return indexes
     }
 
-    public getObjects(): Array<T> {
-        return this.objects
+
+    public get objects(): Array<T> {
+        return this._objects
     }
 
-    public getChildren(): Array<QuadTree<T>> {
-        return this.children
+    public get children(): Array<QuadTree<T>> {
+        return this._children
     }
 }
 export enum QuadTreeDir {

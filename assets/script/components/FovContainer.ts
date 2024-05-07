@@ -9,9 +9,9 @@ export default class FovContainer extends cc.Component {
     @property([cc.SpriteFrame])
     fov_spriteFrames: Array<cc.SpriteFrame> = []
 
-    private fovQuadTree: QuadTree<fovTileData> = null
-    private fovQuadSize: number = 64
-    private fovTileSize: { width: number, height: number } = { width: 112, height: 64 }
+    private fovQuadTree: QuadTree<FovTileData> = null
+    private fovQuadSize: number = 128
+    private fovTileSize: { width: number, height: number } = { width: 56, height: 32 }
 
     private fovTileNodesPool: ObjectPool<cc.Node> = new ObjectPool<cc.Node>(() => new cc.Node())
 
@@ -29,7 +29,7 @@ export default class FovContainer extends cc.Component {
         const halfTileHeight = this.fovTileSize.height / 2
 
         const rootBounds: QuadTreeRect = { x: boundsPosX, y: boundsPosY, width: boundsWidth, height: boundsHeight }
-        this.fovQuadTree = new QuadTree<fovTileData>(rootBounds, 5)
+        this.fovQuadTree = new QuadTree<FovTileData>(rootBounds, 4)
 
         for (let i = 0; i < Math.pow(this.fovQuadSize, 2); i++) {
 
@@ -42,13 +42,13 @@ export default class FovContainer extends cc.Component {
             const tileBoundsX = this.fovQuadTree.bounds.x + (cols - 1) * this.fovTileSize.width
             const tileBoundsY = this.fovQuadTree.bounds.y + (rows - 1) * this.fovTileSize.height
             const tileRect: QuadTreeRect = { x: tileBoundsX, y: tileBoundsY, width: this.fovTileSize.width, height: this.fovTileSize.height }
-            const quadTreeObject: fovTileData = { id: i, owningRect: tileRect, node: null, value: 0, tilePos: { x: nodeX, y: nodeY } }
+            const quadTreeObject: FovTileData = { id: i, owningRect: tileRect, node: null, value: 0, tilePos: { x: nodeX, y: nodeY }, unlock: false }
 
             // 绑定碰撞矩形和迷雾块节点插入四叉树中
             this.fovQuadTree.insert(tileRect, quadTreeObject)
         }
 
-        console.log(this.fovQuadTree)
+        // console.log(this.fovQuadTree)
     }
 
     public retrieve(rect: QuadTreeRect) {
@@ -79,7 +79,8 @@ export default class FovContainer extends cc.Component {
                 node.height = this.fovTileSize.height
                 node.opacity = 180
             }
-            node.getComponent(cc.Sprite).spriteFrame = this.fov_spriteFrames[fovTile.value]
+            // node.getComponent(cc.Sprite).spriteFrame = this.fov_spriteFrames[fovTile.value]
+            if (fovTile.unlock) node.opacity = 0
             node.setPosition(fovTile.tilePos.x, fovTile.tilePos.y)
             this.node.addChild(node)
 
@@ -89,10 +90,11 @@ export default class FovContainer extends cc.Component {
     }
 }
 
-type fovTileData = {
+type FovTileData = {
     id: number,
-    owningRect: QuadTreeRect,
-    tilePos: { x: number, y: number },
     value: number,
     node: cc.Node,
+    owningRect: QuadTreeRect,
+    tilePos: { x: number, y: number },
+    unlock: boolean
 }

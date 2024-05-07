@@ -170,7 +170,7 @@ export class AStarGridMesh {
         const top = this.blocks[block.y + 1] ? this.blocks[block.y + 1][block.x] : undefined
         const bottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x] : undefined
 
-        const leftTop = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x - 1] : undefined
+        const leftTop = this.blocks[block.y - 1] ? this.blocks[block.y + 1][block.x - 1] : undefined
         const rightTop = this.blocks[block.y + 1] ? this.blocks[block.y + 1][block.x + 1] : undefined
         const leftBottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x - 1] : undefined
         const rightBottom = this.blocks[block.y - 1] ? this.blocks[block.y - 1][block.x + 1] : undefined

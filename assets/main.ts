@@ -186,7 +186,8 @@ export default class Main extends cc.Component {
             if (!this.isTouchMoving) {
                 const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
                 const block = this.astarGridhMesh.getBlockByPos(mapPos)
-                this.lbl_pos.getComponent(cc.Label).string = `(${Math.ceil(mapPos.x)},${Math.ceil(mapPos.y)})\n(${block.x},${block.y})`
+                const blockPos = this.astarGridhMesh.getPosByBlock(block)
+                this.lbl_pos.getComponent(cc.Label).string = `(${Math.ceil(mapPos.x)},${Math.ceil(mapPos.y)})\n(${block.x},${block.y})\n(${blockPos.x},${blockPos.y})`
             }
 
             // const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
@@ -195,39 +196,85 @@ export default class Main extends cc.Component {
             // this.graphicsContainerCom.drawFov(GraphicsType.WARFOV, cc.rect(blockPos.x, blockPos.y, 32, 32))
 
             // 迷雾瓦片
-            const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
-            const rect: QuadTreeRect = { x: mapPos.x, y: mapPos.y, width: 32, height: 32 }
-            const result = this.fovContainerCom.retrieveExt(rect)
 
-            if (result.length == 1) {
-                for (const [dirIndex, fovTileData] of result[0].getObjects().entries()) {
-                    switch (dirIndex) {
-                        case 0:
-                            fovTileData.value = 1
-                            break
-                        case 1:
-                            fovTileData.value = 2
-                            break
-                        case 2:
-                            fovTileData.value = 4
-                            break
-                        case 3:
-                            fovTileData.value = 8
-                            break
-                    }
+
+
+
+            // 视野范围
+            if (!this.isTouchMoving) {
+                const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
+                const block = this.astarGridhMesh.getBlockByPos(mapPos)
+                const blockPos = this.astarGridhMesh.getPosByBlock(block)
+
+                for (const eyeBlock of this.astarGridhMesh.getNeighbors(block)) {
+                    const eyeBlockPos = this.astarGridhMesh.getPosByBlock(eyeBlock)
+                    this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(eyeBlockPos.x, eyeBlockPos.y, 32, 32), cc.color(0, 255, 0, 150), true)
                 }
 
+                const rect: QuadTreeRect = { x: Math.ceil(blockPos.x - 32), y: Math.ceil(blockPos.y - 32), width: 96, height: 96 }
+                const result = this.fovContainerCom.retrieve(rect)
+                for (const tile of result) {
+                    if (tile.unlock) continue
+                    tile.unlock = true
+                }
+                // console.log(result)
+
+
+                // if (result.length == 1) {
+                //     const tiles: Array<FovTileData> = [result[0].objects[2], result[0].objects[3], result[0].objects[0], result[0].objects[1]]
+                //     if (!tiles[0].unlock || !tiles[1].unlock || !tiles[2].unlock || !tiles[3].unlock) {
+                //         tiles[0].value += 4
+                //         tiles[1].value += 8
+                //         tiles[2].value += 1
+                //         tiles[3].value += 2
+
+                //         tiles[0].unlock = true
+                //         tiles[1].unlock = true
+                //         tiles[2].unlock = true
+                //         tiles[3].unlock = true
+
+                //         if (tiles[0].value > 15) tiles[0].value = 15
+                //     }
+                // }
+
+                // if (result.length == 2) {
+                //     //  考虑上下(1)和左右(2)关系
+                //     const type = result[0].bounds.x == result[1].bounds.x ? 1 : 2
+                //     const tiles: Array<FovTileData> = []
+                //     if (type == 1) {
+                //         const topQuadTree = result[0].bounds.y > result[1].bounds.y ? result[0] : result[1]
+                //         const bottomQuadTree = result[0].bounds.y < result[1].bounds.y ? result[0] : result[1]
+                //         tiles.push(...[topQuadTree.objects[0], topQuadTree.objects[1], bottomQuadTree.objects[2], bottomQuadTree.objects[3]])
+                //     }
+                //     else {
+                //         const leftQuadTree = result[0].bounds.x < result[1].bounds.x ? result[0] : result[1]
+                //         const rightQuadTree = result[0].bounds.x > result[1].bounds.x ? result[0] : result[1]
+                //         tiles.push(...[leftQuadTree.objects[3], rightQuadTree.objects[2], leftQuadTree.objects[1], rightQuadTree.objects[0]])
+
+                //     }
+
+                //     if (!tiles[0].unlock || !tiles[1].unlock || !tiles[2].unlock || !tiles[3].unlock) {
+                //         tiles[0].value += 4
+                //         tiles[1].value += 8
+                //         tiles[2].value += 1
+                //         tiles[3].value += 2
+
+                //         tiles[0].unlock = true
+                //         tiles[1].unlock = true
+                //         tiles[2].unlock = true
+                //         tiles[3].unlock = true
+
+                //         if (tiles[0].value > 15) tiles[0].value = 15
+
+                //     }
+                // }
+
+
             }
-
-            if (result.length == 2) {
-                
-            }
-
-
 
             this.updateVisibleTiles()
 
-            console.log(result)
+
 
 
             this.isTouchMoving = false
