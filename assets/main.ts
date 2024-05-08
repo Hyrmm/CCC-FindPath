@@ -96,9 +96,11 @@ export default class Main extends cc.Component {
     private initEventListener() {
 
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
-            this.isTouchMoving = true
 
             const delta = event.touch.getDelta()
+            if (delta.x == 0 || delta.y == 0) return
+
+            this.isTouchMoving = true
 
             // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
             const changePosY = this.map_container.y + delta.y
@@ -196,12 +198,8 @@ export default class Main extends cc.Component {
             // this.graphicsContainerCom.drawFov(GraphicsType.WARFOV, cc.rect(blockPos.x, blockPos.y, 32, 32))
 
             // 迷雾瓦片
-
-
-
-
             // 视野范围
-            if (!this.isTouchMoving) {
+            if (!this.isEditing && !this.isTouchMoving) {
                 const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
                 const block = this.astarGridhMesh.getBlockByPos(mapPos)
                 const blockPos = this.astarGridhMesh.getPosByBlock(block)
@@ -273,10 +271,6 @@ export default class Main extends cc.Component {
             }
 
             this.updateVisibleTiles()
-
-
-
-
             this.isTouchMoving = false
         }, this)
 
