@@ -19,6 +19,9 @@ export default class Main extends cc.Component {
     viewPort: cc.Node = null
 
     @property(cc.Node)
+    bounding_box: cc.Node = null
+
+    @property(cc.Node)
     map_container: cc.Node = null
 
     @property(cc.Node)
@@ -29,9 +32,6 @@ export default class Main extends cc.Component {
 
     @property(cc.Node)
     graphics_container: cc.Node = null
-
-    @property(cc.Node)
-    entity_start: cc.Node = null
 
     @property(cc.Node)
     btn_edit: cc.Node = null
@@ -134,7 +134,7 @@ export default class Main extends cc.Component {
             if (!this.isTouchMoving && !this.isEditing) {
 
                 const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
-                const entityPos = this.entity_start.getPosition()
+                const entityPos = this.entityContainerCom.getEntity("entity_start").getPosition()
 
                 this.graphicsContainerCom.clear(GraphicsType.PATH)
 
@@ -170,7 +170,8 @@ export default class Main extends cc.Component {
                 }
 
                 // 实体移动
-                this.entityContainerCom.addShadowPos(this.entity_start.name, vec2Path.reverse())
+                // this.entityContainerCom.addShadowPos("entity_start", vec2Path.reverse())
+                this.entityContainerCom.addCommonPos("entity_start", vec2Path.reverse())
             }
 
             // 编辑地图
@@ -192,12 +193,6 @@ export default class Main extends cc.Component {
                 this.lbl_pos.getComponent(cc.Label).string = `(${Math.ceil(mapPos.x)},${Math.ceil(mapPos.y)})\n(${block.x},${block.y})\n(${blockPos.x},${blockPos.y})`
             }
 
-            // const mapPos = this.mapContainer.convertToNodeSpaceAR(event.getLocation())
-            // const block = this.astarGridhMesh.getBlockByPos(mapPos)
-            // const blockPos = this.astarGridhMesh.getPosByBlock(block)
-            // this.graphicsContainerCom.drawFov(GraphicsType.WARFOV, cc.rect(blockPos.x, blockPos.y, 32, 32))
-
-            // 迷雾瓦片
             // 视野范围
             if (!this.isEditing && !this.isTouchMoving) {
                 const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
@@ -380,5 +375,28 @@ export default class Main extends cc.Component {
 
         URL.revokeObjectURL(url)
         document.body.removeChild(link)
+    }
+
+    protected update(dt: number): void {
+
+        const entityPos = this.entityContainerCom.getEntity("entity_start").getPosition()
+
+        const entityWorldPos = this.map_container.convertToWorldSpaceAR(entityPos)
+        const viewportCentPos = this.viewPort.convertToWorldSpaceAR(cc.v2(0, 0))
+
+        if (!cc.rect(viewportCentPos.x - 50, viewportCentPos.y - 300, 200, 600).contains(entityWorldPos)) {
+            const delta = Math.min((dt * 1000) / 1000, 1)
+            const offsetPos = new cc.Vec2(viewportCentPos.x - entityWorldPos.x, viewportCentPos.y - entityWorldPos.y)
+
+            if (!offsetPos.equals(cc.Vec2.ZERO)) {
+                // 极限情况，真实位置永远趋近于目标影子位置，当相离位置小于0.1像素时直接修正到目标影子位置
+                const interpolationX = Math.abs(offsetPos.x) <= 0.1 ? offsetPos.x : delta * offsetPos.x
+                const interpolationY = Math.abs(offsetPos.y) <= 0.1 ? offsetPos.y : delta * offsetPos.y
+                this.map_container.position = this.map_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
+                this.graphics_container.position = this.graphics_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
+                this.entity_container.position = this.entity_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
+            }
+        }
+
     }
 }

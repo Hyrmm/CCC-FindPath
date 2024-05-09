@@ -24,6 +24,30 @@ export default class EntityContainer extends cc.Component {
 
     protected update(dt: number): void {
         this.updateEneityInterpPos(dt)
+        this.updateEneityCommonPos(dt)
+    }
+
+    private updateEneityCommonPos(dt: number): void {
+        // 常规移动，时间*速度
+        const speed = 200
+        for (const entity of this.entities.values()) {
+            if (!entity.commonPos || !entity.commonPos.length) return
+            if (!entity.curCommonPos) entity.curCommonPos = entity.commonPos.shift()
+
+            const curPos = entity.position
+            const curCommonPos = entity.curCommonPos
+            const offsetPos = new cc.Vec2(curCommonPos.x - curPos.x, curCommonPos.y - curPos.y)
+
+            let deltX = curPos.x + speed * dt
+            let deltY = curPos.x + speed * dt
+
+            if (deltX == curCommonPos.x && deltY == curCommonPos.y) {
+                entity.curCommonPos = null
+            } else {
+                entity.position.x = deltX > curCommonPos.x ? curCommonPos.x : deltX
+                entity.position.y = deltY > curCommonPos.y ? curCommonPos.y : deltY
+            }
+        }
     }
 
     private updateEneityInterpPos(dt: number): void {
@@ -33,7 +57,7 @@ export default class EntityContainer extends cc.Component {
             if ((!entity.shadowPos || !entity.shadowPos.length) && !entity.curShadowPos) return
 
             if (!entity.curShadowPos) entity.curShadowPos = entity.shadowPos.shift()
-            
+
             const curPos = entity.position
             const curShadowPos = entity.curShadowPos
             const offsetPos = new cc.Vec2(curShadowPos.x - curPos.x, curShadowPos.y - curPos.y)
@@ -43,7 +67,7 @@ export default class EntityContainer extends cc.Component {
                 let interpolationX = Math.abs(offsetPos.x) <= 1 ? offsetPos.x : delta * offsetPos.x
                 let interpolationY = Math.abs(offsetPos.y) <= 1 ? offsetPos.y : delta * offsetPos.y
                 entity.position = entity.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
-                if (Math.abs(offsetPos.x) <= 1 && Math.abs(offsetPos.y) <= 1) entity.curShadowPos = null
+                if (Math.abs(offsetPos.x) <= 0 && Math.abs(offsetPos.y) <= 0) entity.curShadowPos = null
             } else {
                 entity.curShadowPos = null
             }
@@ -56,15 +80,28 @@ export default class EntityContainer extends cc.Component {
         this.entities.set(entity.name, entity)
     }
 
+    public getEntity(entityName: string) {
+        return this.entities.get(entityName)
+    }
+
     public addShadowPos(entityName: string, pos: Array<cc.Vec2>): void {
         if (!this.entities.has(entityName)) return
         this.entities.get(entityName).shadowPos = pos
         this.entities.get(entityName).curShadowPos = null
     }
+
+    public addCommonPos(entityName: string, pos: Array<cc.Vec2>): void {
+        if (!this.entities.has(entityName)) return
+        this.entities.get(entityName).commonPos = pos
+        this.entities.get(entityName).curCommonPos = null
+    }
+
 }
 
 
 export type Entity = {
+    commonPos?: Array<cc.Vec2>
+    curCommonPos?: cc.Vec2 | null
     shadowPos?: Array<cc.Vec2>
     curShadowPos?: cc.Vec2 | null
 } & cc.Node
