@@ -5,12 +5,23 @@
  * @Last Modified time: 2024-04-30 14:43:18
  */
 
+/**
+ * 求两点间的中点坐标
+ * @param point1 
+ * @param point2 
+ * @returns 
+ */
 export function getMidpoint(point1: cc.Vec2, point2: cc.Vec2): cc.Vec2 {
     const xMid = (point1.x + point2.x) / 2;
     const yMid = (point1.y + point2.y) / 2;
     return new cc.Vec2(xMid, yMid);
 }
 
+/**
+ * 求三角形外心坐标
+ * @param vertexs 
+ * @returns 
+ */
 export function getCircumcenter(vertexs: Array<cc.Vec2>): cc.Vec2 {
     // 计算中垂线斜率
     const A = vertexs[0];
@@ -41,6 +52,12 @@ export function getCircumcenter(vertexs: Array<cc.Vec2>): cc.Vec2 {
     return new cc.Vec2(xCenter, yCenter)
 }
 
+/**
+ * 求两个多边形的共同顶点
+ * @param vertexs1 
+ * @param vertexs2 
+ * @returns 
+ */
 export function getCommonVertexs(vertexs1: Array<cc.Vec2>, vertexs2: Array<cc.Vec2>): Array<cc.Vec2> {
 
     const result: Array<cc.Vec2> = []
@@ -53,7 +70,7 @@ export function getCommonVertexs(vertexs1: Array<cc.Vec2>, vertexs2: Array<cc.Ve
     return result
 }
 /**
- * 
+ * 求俩点间的斜线方程
  * @param point1 
  * @param point2 
  * @param type 0:根据x值求y值 1:根据y值求x值
@@ -92,7 +109,12 @@ export function getLineFunc(point1: cc.Vec2, point2: cc.Vec2, type: number): (p:
 
 }
 
-export function flatVertexs2Vec2(vertexs: Array<number>) {
+/**
+ * 扁平左边转vec2
+ * @param vertexs
+ * @returns 
+ */
+export function flatVertexs2Vec2(vertexs: Array<number>): Array<cc.Vec2> {
     const result: Array<cc.Vec2> = []
     for (let i = 0; i < vertexs.length; i += 2) {
         result.push(new cc.Vec2(vertexs[i], vertexs[i + 1]))

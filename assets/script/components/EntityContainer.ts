@@ -27,31 +27,62 @@ export default class EntityContainer extends cc.Component {
         this.updateEneityCommonPos(dt)
     }
 
+    public addEntity(entity: Entity): void {
+        if (this.entities.has(entity.name)) console.warn(`Entity ${entity.name} 已经存在`)
+        this.entities.set(entity.name, entity)
+    }
+
+    public getEntity(entityName: string) {
+        return this.entities.get(entityName)
+    }
+
+    public addShadowPos(entityName: string, pos: Array<cc.Vec2>): void {
+        if (!this.entities.has(entityName)) return
+        this.entities.get(entityName).shadowPos = pos
+        this.entities.get(entityName).curShadowPos = null
+    }
+
+    public addCommonPos(entityName: string, pos: Array<cc.Vec2>): void {
+        if (!this.entities.has(entityName)) return
+        this.entities.get(entityName).commonPos = pos
+        this.entities.get(entityName).curCommonPos = null
+    }
+
+    /**
+     * 常规移动算法，v=s*t
+     * @param dt 
+     * @returns 
+     */
     private updateEneityCommonPos(dt: number): void {
-        // 常规移动，时间*速度
         const speed = 200
         for (const entity of this.entities.values()) {
-            if (!entity.commonPos || !entity.commonPos.length) return
+            if ((!entity.commonPos || !entity.commonPos.length) && !entity.curCommonPos) return entity.state = null
             if (!entity.curCommonPos) entity.curCommonPos = entity.commonPos.shift()
 
-            const curPos = entity.position
-            const curCommonPos = entity.curCommonPos
-            const offsetPos = new cc.Vec2(curCommonPos.x - curPos.x, curCommonPos.y - curPos.y)
+            entity.state = EntityState.MOVING
+            
+            const distanceVec = entity.curCommonPos.sub(cc.v2(entity.position.x, entity.position.y))
+            const distance = distanceVec.mag()
 
-            let deltX = curPos.x + speed * dt
-            let deltY = curPos.x + speed * dt
-
-            if (deltX == curCommonPos.x && deltY == curCommonPos.y) {
+            // 如果距离小于每帧的移动距离，则说明已经到达目标位置
+            if (distance <= speed * dt) {
+                entity.setPosition(entity.curCommonPos.x, entity.curCommonPos.y)
                 entity.curCommonPos = null
             } else {
-                entity.position.x = deltX > curCommonPos.x ? curCommonPos.x : deltX
-                entity.position.y = deltY > curCommonPos.y ? curCommonPos.y : deltY
+                const moveDistance = distanceVec.normalize().mul(speed * dt)
+                entity.position = entity.position.add(cc.v3(moveDistance.x, moveDistance.y, 0))
             }
+
+
         }
     }
 
+    /**
+     * 影子追踪算法，插值平滑移动
+     * @param dt 
+     * @returns 
+     */
     private updateEneityInterpPos(dt: number): void {
-        // 插值，影子追踪算法，相对平滑的移动
         const delta = Math.min((dt * 1000) / 300, 1)
         for (const entity of this.entities.values()) {
             if ((!entity.shadowPos || !entity.shadowPos.length) && !entity.curShadowPos) return
@@ -75,33 +106,32 @@ export default class EntityContainer extends cc.Component {
         }
     }
 
-    public addEntity(entity: Entity): void {
-        if (this.entities.has(entity.name)) console.warn(`Entity ${entity.name} 已经存在`)
-        this.entities.set(entity.name, entity)
-    }
-
-    public getEntity(entityName: string) {
-        return this.entities.get(entityName)
-    }
-
-    public addShadowPos(entityName: string, pos: Array<cc.Vec2>): void {
-        if (!this.entities.has(entityName)) return
-        this.entities.get(entityName).shadowPos = pos
-        this.entities.get(entityName).curShadowPos = null
-    }
-
-    public addCommonPos(entityName: string, pos: Array<cc.Vec2>): void {
-        if (!this.entities.has(entityName)) return
-        this.entities.get(entityName).commonPos = pos
-        this.entities.get(entityName).curCommonPos = null
-    }
-
 }
+
+// export class Entity extends cc.Node {
+
+//     private commonPos?: Array<cc.Vec2>
+//     private curCommonPos?: cc.Vec2 | null
+//     private shadowPos?: Array<cc.Vec2>
+//     private curShadowPos?: cc.Vec2 | null
+
+//     state: EntityState = EntityState.IDLE
+
+//     constructor(name: string) {
+//         super(name)
+//     }
+// }
 
 
 export type Entity = {
-    commonPos?: Array<cc.Vec2>
-    curCommonPos?: cc.Vec2 | null
-    shadowPos?: Array<cc.Vec2>
-    curShadowPos?: cc.Vec2 | null
+    state?: EntityState | undefined
+    commonPos?: Array<cc.Vec2> | undefined
+    curCommonPos?: cc.Vec2 | undefined
+    shadowPos?: Array<cc.Vec2> | undefined
+    curShadowPos?: cc.Vec2 | undefined
 } & cc.Node
+
+export enum EntityState {
+    IDLE,
+    MOVING,
+}

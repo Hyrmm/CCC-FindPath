@@ -7,7 +7,7 @@
 
 const { ccclass, property } = cc._decorator
 import { QuadTree, QuadTreeRect } from './script/dataStructure/QuadTree'
-import EntityContainer from './script/components/EntityContainer'
+import EntityContainer, { EntityState } from './script/components/EntityContainer'
 import { AStarGridMesh, Block, BlockType } from "./script/algorithm/AStarGridMesh"
 import GraphicsContainer, { GraphicsType } from './script/components/GraphicsContainer'
 import FovContainer from './script/components/FovContainer'
@@ -42,25 +42,36 @@ export default class Main extends cc.Component {
     @property(cc.Node)
     lbl_mode: cc.Node = null
 
+    // 子节点组件
     private entityContainerCom: EntityContainer
     private graphicsContainerCom: GraphicsContainer
     private fovContainerCom: FovContainer
     private mapContainerCom: MapContainer
 
+    // 地图编辑相关属性
     private isEditing: boolean = false
     private editingBlock: BlockType = BlockType.BLOCK
     private isTouchMoving: boolean = false
 
+    // 寻路地图相关数据
     private mapData: MapData = null
     private astarGridhMesh: AStarGridMesh = null
-
     private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
+
+    // 视角跟随拖动相数据
+    private cameraTargetPos: cc.Vec2 | null = null
+    private cameraFollowBounds: cc.Rect | null = null
+
     protected start() {
 
         this.mapContainerCom = this.map_container.getComponent(MapContainer)
         this.fovContainerCom = this.fov_container.getComponent(FovContainer)
         this.entityContainerCom = this.entity_container.getComponent(EntityContainer)
         this.graphicsContainerCom = this.graphics_container.getComponent(GraphicsContainer)
+
+        const viewportCenterPos = this.viewPort.convertToWorldSpaceAR(cc.v2(0, 0))
+        this.cameraFollowBounds = cc.rect(viewportCenterPos.x - 50, viewportCenterPos.y - 300, 100, 600)
+
 
         // 地图四叉树
         console.time("MapQuadTree")
@@ -98,29 +109,34 @@ export default class Main extends cc.Component {
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
 
             const delta = event.touch.getDelta()
-            if (delta.x == 0 || delta.y == 0) return
+            if (delta.x == 0 && delta.y == 0) return
 
             this.isTouchMoving = true
 
             // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
-            const changePosY = this.map_container.y + delta.y
-            const changePosX = this.map_container.x + delta.x
+            let deltaX, deltaY
+            const changePosY = this.map_container.y + delta.y * 40
+            const changePosX = this.map_container.x + delta.x * 40
+
+            console.log(delta.x, delta.y)
 
             if (Math.abs(changePosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
-                this.map_container.x = changePosX
-                this.entity_container.x = changePosX
-                this.graphics_container.x = changePosX
-                this.fov_container.x = changePosX
+                // this.map_container.x = changePosX
+                // this.entity_container.x = changePosX
+                // this.graphics_container.x = changePosX
+                // this.fov_container.x = changePosX
+                deltaX = changePosX
             }
 
             if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
-                this.map_container.y = changePosY
-                this.entity_container.y = changePosY
-                this.graphics_container.y = changePosY
-                this.fov_container.y = changePosY
+                // this.map_container.y = changePosY
+                // this.entity_container.y = changePosY
+                // this.graphics_container.y = changePosY
+                // this.fov_container.y = changePosY
+                deltaY = changePosY
             }
 
-            this.updateVisibleTiles()
+            this.cameraTargetPos = cc.v2(deltaX ? deltaX : this.map_container.x, deltaY ? deltaY : this.map_container.y)
 
         }, this)
 
@@ -170,7 +186,6 @@ export default class Main extends cc.Component {
                 }
 
                 // 实体移动
-                // this.entityContainerCom.addShadowPos("entity_start", vec2Path.reverse())
                 this.entityContainerCom.addCommonPos("entity_start", vec2Path.reverse())
             }
 
@@ -194,76 +209,23 @@ export default class Main extends cc.Component {
             }
 
             // 视野范围
-            if (!this.isEditing && !this.isTouchMoving) {
-                const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
-                const block = this.astarGridhMesh.getBlockByPos(mapPos)
-                const blockPos = this.astarGridhMesh.getPosByBlock(block)
+            // if (!this.isEditing && !this.isTouchMoving) {
+            //     const mapPos = this.map_container.convertToNodeSpaceAR(event.getLocation())
+            //     const block = this.astarGridhMesh.getBlockByPos(mapPos)
+            //     const blockPos = this.astarGridhMesh.getPosByBlock(block)
 
-                for (const eyeBlock of this.astarGridhMesh.getNeighbors(block)) {
-                    const eyeBlockPos = this.astarGridhMesh.getPosByBlock(eyeBlock)
-                    this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(eyeBlockPos.x, eyeBlockPos.y, 32, 32), cc.color(0, 255, 0, 150), true)
-                }
+            //     for (const eyeBlock of this.astarGridhMesh.getNeighbors(block)) {
+            //         const eyeBlockPos = this.astarGridhMesh.getPosByBlock(eyeBlock)
+            //         this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(eyeBlockPos.x, eyeBlockPos.y, 32, 32), cc.color(0, 255, 0, 150), true)
+            //     }
 
-                const rect: QuadTreeRect = { x: Math.ceil(blockPos.x - 32), y: Math.ceil(blockPos.y - 32), width: 96, height: 96 }
-                const result = this.fovContainerCom.retrieve(rect)
-                for (const tile of result) {
-                    if (tile.unlock) continue
-                    tile.unlock = true
-                }
-                // console.log(result)
-
-
-                // if (result.length == 1) {
-                //     const tiles: Array<FovTileData> = [result[0].objects[2], result[0].objects[3], result[0].objects[0], result[0].objects[1]]
-                //     if (!tiles[0].unlock || !tiles[1].unlock || !tiles[2].unlock || !tiles[3].unlock) {
-                //         tiles[0].value += 4
-                //         tiles[1].value += 8
-                //         tiles[2].value += 1
-                //         tiles[3].value += 2
-
-                //         tiles[0].unlock = true
-                //         tiles[1].unlock = true
-                //         tiles[2].unlock = true
-                //         tiles[3].unlock = true
-
-                //         if (tiles[0].value > 15) tiles[0].value = 15
-                //     }
-                // }
-
-                // if (result.length == 2) {
-                //     //  考虑上下(1)和左右(2)关系
-                //     const type = result[0].bounds.x == result[1].bounds.x ? 1 : 2
-                //     const tiles: Array<FovTileData> = []
-                //     if (type == 1) {
-                //         const topQuadTree = result[0].bounds.y > result[1].bounds.y ? result[0] : result[1]
-                //         const bottomQuadTree = result[0].bounds.y < result[1].bounds.y ? result[0] : result[1]
-                //         tiles.push(...[topQuadTree.objects[0], topQuadTree.objects[1], bottomQuadTree.objects[2], bottomQuadTree.objects[3]])
-                //     }
-                //     else {
-                //         const leftQuadTree = result[0].bounds.x < result[1].bounds.x ? result[0] : result[1]
-                //         const rightQuadTree = result[0].bounds.x > result[1].bounds.x ? result[0] : result[1]
-                //         tiles.push(...[leftQuadTree.objects[3], rightQuadTree.objects[2], leftQuadTree.objects[1], rightQuadTree.objects[0]])
-
-                //     }
-
-                //     if (!tiles[0].unlock || !tiles[1].unlock || !tiles[2].unlock || !tiles[3].unlock) {
-                //         tiles[0].value += 4
-                //         tiles[1].value += 8
-                //         tiles[2].value += 1
-                //         tiles[3].value += 2
-
-                //         tiles[0].unlock = true
-                //         tiles[1].unlock = true
-                //         tiles[2].unlock = true
-                //         tiles[3].unlock = true
-
-                //         if (tiles[0].value > 15) tiles[0].value = 15
-
-                //     }
-                // }
-
-
-            }
+            //     const rect: QuadTreeRect = { x: Math.ceil(blockPos.x - 32), y: Math.ceil(blockPos.y - 32), width: 96, height: 96 }
+            //     const result = this.fovContainerCom.retrieve(rect)
+            //     for (const tile of result) {
+            //         if (tile.unlock) continue
+            //         tile.unlock = true
+            //     }
+            // }
 
             this.updateVisibleTiles()
             this.isTouchMoving = false
@@ -299,6 +261,35 @@ export default class Main extends cc.Component {
 
     }
 
+    private updateCameraTouch(dt: number) {
+
+        if (!this.cameraTargetPos) return
+
+
+        const delta = Math.min((dt * 1000) / 100, 1)
+        const distanceVec = this.cameraTargetPos.sub(cc.v2(this.map_container.x, this.map_container.y))
+        const distance = distanceVec.mag()
+
+        if (distance < 1) {
+            this.map_container.setPosition(this.cameraTargetPos)
+            this.graphics_container.setPosition(this.cameraTargetPos)
+            this.entity_container.setPosition(this.cameraTargetPos)
+            this.cameraTargetPos = null
+            this.updateVisibleTiles()
+        } else {
+            const offsetPos = new cc.Vec2(this.cameraTargetPos.x - this.map_container.x, this.cameraTargetPos.y - this.map_container.y)
+            const interpolationX = Math.abs(offsetPos.x) <= 5 ? offsetPos.x : delta * offsetPos.x
+            const interpolationY = Math.abs(offsetPos.y) <= 5 ? offsetPos.y : delta * offsetPos.y
+            const targetPos = this.map_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
+            this.map_container.setPosition(targetPos)
+            this.graphics_container.setPosition(targetPos)
+            this.entity_container.setPosition(targetPos)
+        }
+
+
+
+    }
+
     private updateVisibleTiles() {
 
         // 计算视口矩形
@@ -317,6 +308,33 @@ export default class Main extends cc.Component {
 
     }
 
+    private updateCameraFollow(dt: number) {
+
+        if (this.entityContainerCom.getEntity("entity_start").state != EntityState.MOVING) return
+        if (this.cameraTargetPos) this.cameraTargetPos = null
+
+        const entityPos = this.entityContainerCom.getEntity("entity_start").getPosition()
+
+        const entityWorldPos = this.map_container.convertToWorldSpaceAR(entityPos)
+        const viewportCentPos = this.viewPort.convertToWorldSpaceAR(cc.v2(0, 0))
+
+        if (!this.cameraFollowBounds.contains(entityWorldPos)) {
+            const delta = Math.min((dt * 1000) / 1000, 1)
+            const offsetPos = cc.v2(viewportCentPos.x - entityWorldPos.x, viewportCentPos.y - entityWorldPos.y)
+
+            if (!offsetPos.equals(cc.Vec2.ZERO)) {
+                // 极限情况，真实位置永远趋近于目标影子位置，当相离位置小于0.1像素时直接修正到目标影子位置
+                const interpolationX = Math.abs(offsetPos.x) <= 0.5 ? offsetPos.x : delta * offsetPos.x
+                const interpolationY = Math.abs(offsetPos.y) <= 0.5 ? offsetPos.y : delta * offsetPos.y
+                this.map_container.position = this.map_container.position.add(cc.v3(interpolationX, interpolationY, 0))
+                this.graphics_container.position = this.graphics_container.position.add(cc.v3(interpolationX, interpolationY, 0))
+                this.entity_container.position = this.entity_container.position.add(cc.v3(interpolationX, interpolationY, 0))
+            }
+        }
+    }
+
+
+
     private drawMapMesh() {
         this.graphicsContainerCom.clear(GraphicsType.MESH)
 
@@ -334,28 +352,27 @@ export default class Main extends cc.Component {
             }
         }
 
-        // 战争迷雾地图块
-        for (let i = 1; i < this.mapOriSize.width / 224; i++) {
-            const startX = i * 224 - this.mapOriSize.width / 2
-            const startY = this.mapOriSize.height / 2
+        // // 战争迷雾地图块
+        // for (let i = 1; i < this.mapOriSize.width / 224; i++) {
+        //     const startX = i * 224 - this.mapOriSize.width / 2
+        //     const startY = this.mapOriSize.height / 2
 
-            const endX = i * 224 - this.mapOriSize.width / 2
-            const endY = -this.mapOriSize.height / 2
+        //     const endX = i * 224 - this.mapOriSize.width / 2
+        //     const endY = -this.mapOriSize.height / 2
 
-            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.ORANGE)
+        //     this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.ORANGE)
 
-        }
+        // }
 
-        for (let i = 1; i < this.mapOriSize.height / 128; i++) {
-            const startX = -this.mapOriSize.width / 2
-            const startY = i * 128 - this.mapOriSize.height / 2
-            const endX = this.mapOriSize.width / 2
-            const endY = i * 128 - this.mapOriSize.height / 2
+        // for (let i = 1; i < this.mapOriSize.height / 128; i++) {
+        //     const startX = -this.mapOriSize.width / 2
+        //     const startY = i * 128 - this.mapOriSize.height / 2
+        //     const endX = this.mapOriSize.width / 2
+        //     const endY = i * 128 - this.mapOriSize.height / 2
 
-            this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.ORANGE)
-        }
+        //     this.graphicsContainerCom.drawLine(GraphicsType.MESH, [cc.v2(startX, startY), cc.v2(endX, endY)], cc.Color.ORANGE)
+        // }
 
-        // this.graphicsContainerCom.drawRect(GraphicsType.WARFOV, cc.rect(-this.mapOriSize.width / 2, -this.mapOriSize.height / 2, this.mapOriSize.width, this.mapOriSize.height), cc.color(0, 0, 0, 150), true)
     }
 
     private outPutMapData() {
@@ -379,24 +396,13 @@ export default class Main extends cc.Component {
 
     protected update(dt: number): void {
 
-        const entityPos = this.entityContainerCom.getEntity("entity_start").getPosition()
+        // 视角拖动
+        this.updateCameraTouch(dt)
 
-        const entityWorldPos = this.map_container.convertToWorldSpaceAR(entityPos)
-        const viewportCentPos = this.viewPort.convertToWorldSpaceAR(cc.v2(0, 0))
+        // 视角跟随
+        this.updateCameraFollow(dt)
 
-        if (!cc.rect(viewportCentPos.x - 50, viewportCentPos.y - 300, 200, 600).contains(entityWorldPos)) {
-            const delta = Math.min((dt * 1000) / 1000, 1)
-            const offsetPos = new cc.Vec2(viewportCentPos.x - entityWorldPos.x, viewportCentPos.y - entityWorldPos.y)
 
-            if (!offsetPos.equals(cc.Vec2.ZERO)) {
-                // 极限情况，真实位置永远趋近于目标影子位置，当相离位置小于0.1像素时直接修正到目标影子位置
-                const interpolationX = Math.abs(offsetPos.x) <= 0.1 ? offsetPos.x : delta * offsetPos.x
-                const interpolationY = Math.abs(offsetPos.y) <= 0.1 ? offsetPos.y : delta * offsetPos.y
-                this.map_container.position = this.map_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
-                this.graphics_container.position = this.graphics_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
-                this.entity_container.position = this.entity_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
-            }
-        }
 
     }
 }
