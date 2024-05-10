@@ -19,18 +19,19 @@ export default class Main extends cc.Component {
     @property(cc.Node)
     viewPort: cc.Node = null
 
-    @property(cc.Node)
-    bounding_box: cc.Node = null
-
+    // 地图瓦片容器
     @property(cc.Node)
     map_container: cc.Node = null
 
+    // 迷雾瓦片容器
     @property(cc.Node)
     fov_container: cc.Node = null
 
+    // 实体节点容器
     @property(cc.Node)
     entity_container: cc.Node = null
 
+    // 图形节点容器
     @property(cc.Node)
     graphics_container: cc.Node = null
 
@@ -52,7 +53,6 @@ export default class Main extends cc.Component {
     // 地图编辑相关属性
     private isEditing: boolean = false
     private editingBlock: BlockType = BlockType.BLOCK
-
 
     // 寻路地图相关数据
     private mapData: MapData = null
@@ -230,6 +230,7 @@ export default class Main extends cc.Component {
 
     }
 
+    // 平滑插值更新相机位置(手动拖动)
     private updateCameraPos(dt: number) {
 
         if (this.cameraTargetPos.sub(this.map_container.position).mag() == 0) return
@@ -246,6 +247,7 @@ export default class Main extends cc.Component {
         this.updateVisibleTilesThrottle()
     }
 
+    // 平滑插值更新相机位置(自动跟随)
     private updateCameraFollow(dt: number) {
 
         if (this.entityContainerCom.getEntity("entity_start").state != EntityState.MOVING) return
@@ -275,6 +277,7 @@ export default class Main extends cc.Component {
 
     }
 
+    // 更新可视地图、迷雾瓦片(立即)
     private updateVisibleTiles() {
 
         const viewportBoundX = (0 - this.viewPort.width / 2) - this.map_container.x
@@ -291,6 +294,7 @@ export default class Main extends cc.Component {
 
     }
 
+    // 更新可视地图、迷雾瓦片(节流)
     @throttle(500)
     private updateVisibleTilesThrottle() {
 
@@ -309,12 +313,7 @@ export default class Main extends cc.Component {
     }
 
     protected update(dt: number): void {
-
-        // 视角拖动
         this.updateCameraPos(dt)
-
-        // 视角跟随
         this.updateCameraFollow(dt)
-
     }
 }
