@@ -59,8 +59,10 @@ export default class Main extends cc.Component {
     private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
 
     // 视角跟随拖动相数据
-    private cameraTargetPos: cc.Vec2 | null = null
+    private cameraTargetPos: cc.Vec3 | null = null
+    private preCameraTargetPos: cc.Vec3 | null = null
     private cameraFollowBounds: cc.Rect | null = null
+    private cameraInertiaSpeed: cc.Vec3 | null = null
 
     protected start() {
 
@@ -108,35 +110,28 @@ export default class Main extends cc.Component {
 
         this.viewPort.on(cc.Node.EventType.TOUCH_MOVE, (event: cc.Event.EventTouch) => {
 
-            const delta = event.touch.getDelta()
-            if (delta.x == 0 && delta.y == 0) return
+
+            if (event.touch.getDelta().mag() == 0) return
 
             this.isTouchMoving = true
 
-            // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
+
             let deltaX, deltaY
-            const changePosY = this.map_container.y + delta.y * 40
-            const changePosX = this.map_container.x + delta.x * 40
+            const delta = event.touch.getDelta()
+            const targetPosX = this.map_container.x + delta.x
+            const targetPosY = this.map_container.y + delta.y
 
-            console.log(delta.x, delta.y)
 
-            if (Math.abs(changePosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
-                // this.map_container.x = changePosX
-                // this.entity_container.x = changePosX
-                // this.graphics_container.x = changePosX
-                // this.fov_container.x = changePosX
-                deltaX = changePosX
+            // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
+            if (Math.abs(targetPosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
+                deltaX = targetPosX
             }
 
-            if (Math.abs(changePosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
-                // this.map_container.y = changePosY
-                // this.entity_container.y = changePosY
-                // this.graphics_container.y = changePosY
-                // this.fov_container.y = changePosY
-                deltaY = changePosY
+            if (Math.abs(targetPosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
+                deltaY = targetPosY
             }
 
-            this.cameraTargetPos = cc.v2(deltaX ? deltaX : this.map_container.x, deltaY ? deltaY : this.map_container.y)
+            this.cameraTargetPos = cc.v3(deltaX ? deltaX : this.map_container.x, deltaY ? deltaY : this.map_container.y)
 
         }, this)
 
@@ -261,29 +256,37 @@ export default class Main extends cc.Component {
 
     }
 
-    private updateCameraTouch(dt: number) {
+    private updateCameraPos(dt: number) {
 
-        if (!this.cameraTargetPos) return
+        // 瞬时移动
+        if (this.cameraTargetPos) {
 
+            this.preCameraTargetPos = this.map_container.position
+            this.cameraInertiaSpeed = this.cameraTargetPos.sub(this.preCameraTargetPos).div(dt * 100)
 
-        const delta = Math.min((dt * 1000) / 100, 1)
-        const distanceVec = this.cameraTargetPos.sub(cc.v2(this.map_container.x, this.map_container.y))
-        const distance = distanceVec.mag()
-
-        if (distance < 1) {
             this.map_container.setPosition(this.cameraTargetPos)
             this.graphics_container.setPosition(this.cameraTargetPos)
             this.entity_container.setPosition(this.cameraTargetPos)
             this.cameraTargetPos = null
+
             this.updateVisibleTiles()
-        } else {
-            const offsetPos = new cc.Vec2(this.cameraTargetPos.x - this.map_container.x, this.cameraTargetPos.y - this.map_container.y)
-            const interpolationX = Math.abs(offsetPos.x) <= 5 ? offsetPos.x : delta * offsetPos.x
-            const interpolationY = Math.abs(offsetPos.y) <= 5 ? offsetPos.y : delta * offsetPos.y
-            const targetPos = this.map_container.position.add(new cc.Vec3(interpolationX, interpolationY, 0))
-            this.map_container.setPosition(targetPos)
-            this.graphics_container.setPosition(targetPos)
-            this.entity_container.setPosition(targetPos)
+        }
+
+
+        // 惯性移动
+        if (!this.isTouchMoving && this.cameraInertiaSpeed && this.cameraInertiaSpeed.mag() > 0 && !this.cameraTargetPos) {
+
+            this.map_container.position = this.map_container.position.add(this.cameraInertiaSpeed)
+            this.graphics_container.position = this.graphics_container.position.add(this.cameraInertiaSpeed)
+            this.entity_container.position = this.entity_container.position.add(this.cameraInertiaSpeed)
+
+            if (this.cameraInertiaSpeed.mag() <= 1) {
+                this.cameraInertiaSpeed = cc.Vec3.ZERO
+                this.updateVisibleTiles()
+            }
+
+            this.cameraInertiaSpeed = this.cameraInertiaSpeed.mul(0.95)
+
         }
 
 
@@ -292,7 +295,6 @@ export default class Main extends cc.Component {
 
     private updateVisibleTiles() {
 
-        // 计算视口矩形
         const viewportBoundX = (0 - this.viewPort.width / 2) - this.map_container.x
         const viewportBoundY = (0 - this.viewPort.height / 2) - this.map_container.y
         const viewportRect: QuadTreeRect = { x: viewportBoundX, y: viewportBoundY, width: this.viewPort.width, height: this.viewPort.height }
@@ -314,7 +316,6 @@ export default class Main extends cc.Component {
         if (this.cameraTargetPos) this.cameraTargetPos = null
 
         const entityPos = this.entityContainerCom.getEntity("entity_start").getPosition()
-
         const entityWorldPos = this.map_container.convertToWorldSpaceAR(entityPos)
         const viewportCentPos = this.viewPort.convertToWorldSpaceAR(cc.v2(0, 0))
 
@@ -323,17 +324,16 @@ export default class Main extends cc.Component {
             const offsetPos = cc.v2(viewportCentPos.x - entityWorldPos.x, viewportCentPos.y - entityWorldPos.y)
 
             if (!offsetPos.equals(cc.Vec2.ZERO)) {
-                // 极限情况，真实位置永远趋近于目标影子位置，当相离位置小于0.1像素时直接修正到目标影子位置
+                // 极限情况，真实位置永远趋近于目标影子位置，当相离位置小于0.5像素时直接修正到目标影子位置
                 const interpolationX = Math.abs(offsetPos.x) <= 0.5 ? offsetPos.x : delta * offsetPos.x
                 const interpolationY = Math.abs(offsetPos.y) <= 0.5 ? offsetPos.y : delta * offsetPos.y
                 this.map_container.position = this.map_container.position.add(cc.v3(interpolationX, interpolationY, 0))
                 this.graphics_container.position = this.graphics_container.position.add(cc.v3(interpolationX, interpolationY, 0))
                 this.entity_container.position = this.entity_container.position.add(cc.v3(interpolationX, interpolationY, 0))
             }
+            this.updateVisibleTiles()
         }
     }
-
-
 
     private drawMapMesh() {
         this.graphicsContainerCom.clear(GraphicsType.MESH)
@@ -397,7 +397,7 @@ export default class Main extends cc.Component {
     protected update(dt: number): void {
 
         // 视角拖动
-        this.updateCameraTouch(dt)
+        this.updateCameraPos(dt)
 
         // 视角跟随
         this.updateCameraFollow(dt)
