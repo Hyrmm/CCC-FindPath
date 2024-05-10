@@ -1,4 +1,4 @@
-import { Block, BlockType } from "../algorithm/AStarGridMesh";
+import { AStarGridMesh, Block, BlockType } from "../algorithm/AStarGridMesh";
 
 const { ccclass, property } = cc._decorator;
 
@@ -11,6 +11,24 @@ export default class GraphicsContainer extends cc.Component {
 
     protected start(): void {
 
+    }
+
+    public drawMapMesh() {
+        this.clear(GraphicsType.MESH)
+
+        for (const block of AStarGridMesh.getInstance().allBlocks) {
+            const pos = AStarGridMesh.getInstance().getPosByBlock(block)
+
+            switch (block.type) {
+
+                case BlockType.BLOCK:
+                    this.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(0, 255, 0, 80))
+                    break
+                case BlockType.WALL:
+                    this.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(255, 0, 0, 80), true)
+                    break
+            }
+        }
     }
 
     public drawRect(type: GraphicsType, rect: cc.Rect, color: cc.Color = cc.Color.GREEN, fill: boolean = false) {
@@ -42,7 +60,7 @@ export default class GraphicsContainer extends cc.Component {
         ctx.roundRect(rect.x, rect.y, 46, 46, 60)
         ctx.fillColor = cc.color(0, 0, 0, 255)
         ctx.fill()
-        
+
     }
 
     public clear(type: GraphicsType) {

@@ -6,9 +6,6 @@ const { ccclass, property } = cc._decorator;
 @ccclass
 export default class FovContainer extends cc.Component {
 
-    @property([cc.SpriteFrame])
-    fov_spriteFrames: Array<cc.SpriteFrame> = []
-
     private fovQuadTree: QuadTree<FovTileData> = null
     private fovQuadSize: number = 128
     private fovTileSize: { width: number, height: number } = { width: 56, height: 32 }
@@ -60,32 +57,32 @@ export default class FovContainer extends cc.Component {
     }
 
     public updateVisableTiles(rect: QuadTreeRect) {
-        const visibleFovTiles = this.fovQuadTree.retrieve(rect)
+        // const visibleFovTiles = this.fovQuadTree.retrieve(rect)
 
-        this.node.children.forEach((node) => this.fovTileNodesPool.put(node))
-        this.node.removeAllChildren(false)
+        // this.node.children.forEach((node) => this.fovTileNodesPool.put(node))
+        // this.node.removeAllChildren(false)
 
-        for (const fovTile of visibleFovTiles) {
-            let node: cc.Node
+        // for (const fovTile of visibleFovTiles) {
+        //     let node: cc.Node
 
-            if (this.fovTileNodesPool.size() > 0) {
-                node = this.fovTileNodesPool.get()
-            } else {
-                node = new cc.Node(String(fovTile.id))
-                node.setAnchorPoint(0.5, 0.5)
-                node.addComponent(cc.Sprite).spriteFrame = this.fov_spriteFrames[fovTile.value]
-                node.getComponent(cc.Sprite).sizeMode = cc.Sprite.SizeMode.CUSTOM
-                node.width = this.fovTileSize.width
-                node.height = this.fovTileSize.height
-                node.opacity = 180
-            }
-            // node.getComponent(cc.Sprite).spriteFrame = this.fov_spriteFrames[fovTile.value]
-            if (fovTile.unlock) node.opacity = 0
-            node.setPosition(fovTile.tilePos.x, fovTile.tilePos.y)
-            this.node.addChild(node)
+        //     if (this.fovTileNodesPool.size() > 0) {
+        //         node = this.fovTileNodesPool.get()
+        //     } else {
+        //         node = new cc.Node(String(fovTile.id))
+        //         node.setAnchorPoint(0.5, 0.5)
+        //         node.addComponent(cc.Sprite).spriteFrame = this.fov_spriteFrames[fovTile.value]
+        //         node.getComponent(cc.Sprite).sizeMode = cc.Sprite.SizeMode.CUSTOM
+        //         node.width = this.fovTileSize.width
+        //         node.height = this.fovTileSize.height
+        //         node.opacity = 180
+        //     }
+        //     // node.getComponent(cc.Sprite).spriteFrame = this.fov_spriteFrames[fovTile.value]
+        //     if (fovTile.unlock) node.opacity = 0
+        //     node.setPosition(fovTile.tilePos.x, fovTile.tilePos.y)
+        //     this.node.addChild(node)
 
-            fovTile.node = node
-        }
+        //     fovTile.node = node
+        // }
 
     }
 }

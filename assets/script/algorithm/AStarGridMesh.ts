@@ -40,6 +40,15 @@ export class Block implements HeapItem {
 
 export class AStarGridMesh {
 
+    private static instance: AStarGridMesh
+
+    static getInstance(): AStarGridMesh {
+        if (!AStarGridMesh.instance) {
+            AStarGridMesh.instance = new AStarGridMesh()
+        }
+        return AStarGridMesh.instance
+    }
+
     private blocks: Array<Array<Block>> = []
 
     private blockWidth: number
@@ -52,7 +61,11 @@ export class AStarGridMesh {
     private openListHeap: MinHeap<Block> = new MinHeap<Block>([])
     private closeListMap: Map<Block, Block> = new Map()
 
-    constructor(mapData: MapData) {
+    constructor() {
+
+    }
+
+    public reset(mapData: MapData): AStarGridMesh {
         // 构建格子地图
         for (let row = 0; row < mapData.roadDataArr.length; row++) {
 
@@ -72,9 +85,16 @@ export class AStarGridMesh {
         this.blockWidth = mapData.nodeWidth
         this.blockHeight = mapData.nodeHeight
 
+        return this
     }
 
-
+    /**
+     * 寻路入口
+     * @param startPos 
+     * @param endPos 
+     * @param progress 
+     * @returns 
+     */
     public findPath(startPos: cc.Vec2, endPos: cc.Vec2, progress: (block: Block) => void = null): { path: Array<Block>, smoothPath: Array<Block>, collinearPath: Array<Block> } {
         console.time("FindPath")
         let endBlock = this.getBlockByPos(endPos)
@@ -152,7 +172,7 @@ export class AStarGridMesh {
 
 
                 const smoothPath = this.smoothingPath([startBlock].concat(path.concat().reverse()))
-                
+
                 console.timeEnd("FindPath")
                 return { path: path, smoothPath: smoothPath.smoothRes, collinearPath: smoothPath.collinearRes }
             }

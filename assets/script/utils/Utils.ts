@@ -121,3 +121,49 @@ export function flatVertexs2Vec2(vertexs: Array<number>): Array<cc.Vec2> {
     }
     return result
 }
+
+export function throttle(delay: number) {
+    return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalMethod = descriptor.value
+        let lastExecutedTime = 0
+        let timeoutId: ReturnType<typeof setTimeout>
+
+        descriptor.value = function (...args: any[]) {
+            const currentTime = Date.now()
+            const elapsedTime = currentTime - lastExecutedTime;
+
+            if (elapsedTime >= delay) {
+                clearTimeout(timeoutId)
+                lastExecutedTime = currentTime
+                originalMethod.apply(this, args)
+            } else {
+                clearTimeout(timeoutId)
+                timeoutId = setTimeout(() => {
+                    lastExecutedTime = currentTime
+                    originalMethod.apply(this, args)
+                }, delay - elapsedTime)
+            }
+        }
+
+        return descriptor
+    }
+}
+
+export function outPutMapData(mapdata) {
+    const content = JSON.stringify(this.mapData, null, "")
+    const fileName = 'mapData.json'
+
+    const blob = new Blob([content], { type: 'text/json' })
+    const url = URL.createObjectURL(blob)
+
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+
+    document.body.appendChild(link)
+
+    link.click()
+
+    URL.revokeObjectURL(url)
+    document.body.removeChild(link)
+}
