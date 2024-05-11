@@ -16,24 +16,6 @@ export default class GraphicsContainer extends cc.Component {
         this.node.scale = scale
     }
 
-    public drawMapMesh() {
-        this.clear(GraphicsType.MESH)
-
-        for (const block of AStarGridMesh.getInstance().allBlocks) {
-            const pos = AStarGridMesh.getInstance().getPosByBlock(block)
-
-            switch (block.type) {
-
-                case BlockType.BLOCK:
-                    this.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(0, 255, 0, 80))
-                    break
-                case BlockType.WALL:
-                    this.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(255, 0, 0, 80), true)
-                    break
-            }
-        }
-    }
-
     public drawRect(type: GraphicsType, rect: cc.Rect, color: cc.Color = cc.Color.GREEN, fill: boolean = false) {
         const ctx = this.graphics[type]
         if (fill) {
@@ -69,6 +51,24 @@ export default class GraphicsContainer extends cc.Component {
     public clear(type: GraphicsType) {
         const ctx = this.graphics[type]
         ctx.clear()
+    }
+
+    public drawMapMesh() {
+        this.clear(GraphicsType.MESH)
+
+        for (const block of AStarGridMesh.getInstance().allBlocks) {
+            const pos = AStarGridMesh.getInstance().getPosByBlock(block)
+
+            switch (block.type) {
+
+                case BlockType.BLOCK:
+                    this.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(0, 255, 0, 80))
+                    break
+                case BlockType.WALL:
+                    this.drawRect(GraphicsType.MESH, cc.rect(pos.x, pos.y, 32, 32), cc.color(255, 0, 0, 80), true)
+                    break
+            }
+        }
     }
 }
 

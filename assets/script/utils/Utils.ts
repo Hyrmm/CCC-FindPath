@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:34 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-04-30 14:43:18
+ * @Last Modified time: 2024-05-11 18:28:34
  */
 
 /**
@@ -69,6 +69,7 @@ export function getCommonVertexs(vertexs1: Array<cc.Vec2>, vertexs2: Array<cc.Ve
     }
     return result
 }
+
 /**
  * 求俩点间的斜线方程
  * @param point1 
@@ -110,7 +111,7 @@ export function getLineFunc(point1: cc.Vec2, point2: cc.Vec2, type: number): (p:
 }
 
 /**
- * 扁平左边转vec2
+ * 数组扁平顶点坐标转vec2
  * @param vertexs
  * @returns 
  */
@@ -122,6 +123,11 @@ export function flatVertexs2Vec2(vertexs: Array<number>): Array<cc.Vec2> {
     return result
 }
 
+/**
+ * 防抖装饰器
+ * @param delay 
+ * @returns 
+ */
 export function throttle(delay: number) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
         const originalMethod = descriptor.value
@@ -149,7 +155,11 @@ export function throttle(delay: number) {
     }
 }
 
-export function outPutMapData(mapdata) {
+/**
+ * 导出Json文件
+ * @param mapdata 
+ */
+export function outPutJsonFile(json: object) {
     const content = JSON.stringify(this.mapData, null, "")
     const fileName = 'mapData.json'
 

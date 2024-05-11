@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-11 18:19:13
+ * @Last Modified time: 2024-05-11 18:27:45
  */
 
 const { ccclass, property } = cc._decorator
@@ -12,7 +12,7 @@ import { AStarGridMesh, Block, BlockType } from "./script/algorithm/AStarGridMes
 import GraphicsContainer, { GraphicsType } from './script/components/GraphicsContainer'
 import FovContainer from './script/components/FovContainer'
 import MapContainer from './script/components/MapContainer'
-import { outPutMapData, throttle } from './script/utils/Utils'
+import { outPutJsonFile, throttle } from './script/utils/Utils'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -213,7 +213,7 @@ export default class Main extends cc.Component {
         this.btn_edit.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
             if (this.isEditing) {
                 this.graphicsContainerCom.drawMapMesh()
-                outPutMapData(this.mapData)
+                outPutJsonFile(this.mapData)
             }
 
             this.isEditing = !this.isEditing
