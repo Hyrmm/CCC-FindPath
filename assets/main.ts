@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-07 18:01:29
+ * @Last Modified time: 2024-05-11 18:16:24
  */
 
 const { ccclass, property } = cc._decorator
@@ -57,7 +57,7 @@ export default class Main extends cc.Component {
     // 寻路地图相关数据
     private mapData: MapData = null
     private astarGridhMesh: AStarGridMesh = null
-    private mapOriSize: { width: number, height: number } = { width: 1024 * 7, height: 1024 * 4 }
+    private mapOriSize: { width: number, height: number, scale: number } = { width: 1024 * 7, height: 1024 * 4, scale: 1 }
 
     // 视角跟随拖动相数据
     private isTouchMoving: boolean = false
@@ -71,10 +71,12 @@ export default class Main extends cc.Component {
         this.entityContainerCom = this.entity_container.getComponent(EntityContainer)
         this.graphicsContainerCom = this.graphics_container.getComponent(GraphicsContainer)
 
-        this.cameraTargetPos = this.map_container.position.clone()
-
+        // 相机跟随
+        const boundsW = 100 / this.mapOriSize.scale
+        const boundsH = 600 / this.mapOriSize.scale
         const viewportCenterPos = this.viewPort.convertToWorldSpaceAR(cc.v2(0, 0))
-        this.cameraFollowBounds = cc.rect(viewportCenterPos.x - 50, viewportCenterPos.y - 300, 100, 600)
+        this.cameraFollowBounds = cc.rect(viewportCenterPos.x - boundsW / 2, viewportCenterPos.y - boundsH / 2, boundsW, boundsH)
+        this.cameraTargetPos = this.map_container.position.clone()
 
         // 地图四叉树
         console.time("MapQuadTree")
@@ -86,25 +88,20 @@ export default class Main extends cc.Component {
         this.fovContainerCom.initFovQuadTree(this.mapOriSize)
         console.timeEnd("FovQuadTree")
 
-        // AStar寻路网格
-        console.time("astarGridMesh")
-        this.initAStarGridMesh()
-        console.timeEnd("astarGridMesh")
+        // astar寻路网格
+        cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
+            console.time("astarGridMesh")
+            this.mapData = data.json as MapData
+            this.astarGridhMesh = AStarGridMesh.getInstance().reset(this.mapData)
+            this.graphicsContainerCom.drawMapMesh()
+            console.timeEnd("astarGridMesh")
+        })
 
         // 地图触摸相关事件监听
         this.initEventListener()
 
         // 首次地图可视范围更新
         this.scheduleOnce(this.updateVisibleTiles.bind(this), 0.1)
-    }
-
-
-    private initAStarGridMesh() {
-        cc.resources.load("mapData", cc.JsonAsset, (err, data) => {
-            this.mapData = data.json as MapData
-            this.astarGridhMesh = AStarGridMesh.getInstance().reset(this.mapData)
-            this.graphicsContainerCom.drawMapMesh()
-        })
     }
 
     private initEventListener() {
@@ -114,16 +111,20 @@ export default class Main extends cc.Component {
             if (event.touch.getDelta().mag() == 0) return
 
             this.isTouchMoving = true
+
             const moveingDelt = event.touch.getDelta()
             const targetPosX = this.map_container.x + moveingDelt.x * 35
             const targetPosY = this.map_container.y + moveingDelt.y * 35
 
+            const mapW = this.mapOriSize.width * this.mapOriSize.scale
+            const mapH = this.mapOriSize.height * this.mapOriSize.scale
+
             // 边界判断,因项目适配宽度,不同设备高度不同,这里取屏幕高度做判断
-            if (Math.abs(targetPosX) <= this.mapOriSize.width / 2 - this.viewPort.width / 2) {
+            if (Math.abs(targetPosX) <= mapW / 2 - this.viewPort.width / 2) {
                 this.cameraTargetPos.x = targetPosX
             }
 
-            if (Math.abs(targetPosY) <= this.mapOriSize.height / 2 - this.viewPort.height / 2) {
+            if (Math.abs(targetPosY) <= mapH / 2 - this.viewPort.height / 2) {
                 this.cameraTargetPos.y = targetPosY
             }
         }, this)
@@ -142,7 +143,7 @@ export default class Main extends cc.Component {
 
                 this.graphicsContainerCom.clear(GraphicsType.PATH)
 
-                const result = this.astarGridhMesh.findPath(entityPos, cc.v2(Math.ceil(mapPos.x), Math.ceil(mapPos.y)), (block) => {
+                const result = this.astarGridhMesh.findPath(cc.v2(Math.ceil(entityPos.x), Math.ceil(entityPos.y)), cc.v2(Math.ceil(mapPos.x), Math.ceil(mapPos.y)), (block) => {
                     const blockPos = this.astarGridhMesh.getPosByBlock(block)
                     this.graphicsContainerCom.drawRect(GraphicsType.PATH, cc.rect(blockPos.x, blockPos.y, 32, 32), cc.Color.GRAY)
                 })
@@ -204,6 +205,11 @@ export default class Main extends cc.Component {
             this.isTouchMoving = false
         }, this)
 
+        this.viewPort.on(cc.Node.EventType.MOUSE_WHEEL, (event: cc.Event.EventMouse) => {
+            const scale = event.getScrollY() > 0 ? Number((this.mapOriSize.scale + 0.1).toFixed(1)) : Number((this.mapOriSize.scale - 0.1).toFixed(1))
+            this.updateMapScaleThrottle(scale)
+        })
+
         this.btn_edit.on(cc.Node.EventType.TOUCH_END, (event: cc.Event.EventTouch) => {
             if (this.isEditing) {
                 this.graphicsContainerCom.drawMapMesh()
@@ -230,7 +236,11 @@ export default class Main extends cc.Component {
 
     }
 
-    // 平滑插值更新相机位置(手动拖动)
+    /**
+     * 平滑插值更新相机位置(手动拖动)
+     * @param dt 
+     * @returns 
+     */
     private updateCameraPos(dt: number) {
 
         if (this.cameraTargetPos.sub(this.map_container.position).mag() == 0) return
@@ -247,7 +257,11 @@ export default class Main extends cc.Component {
         this.updateVisibleTilesThrottle()
     }
 
-    // 平滑插值更新相机位置(自动跟随)
+    /**
+     * 平滑插值更新相机位置(自动跟随)
+     * @param dt 
+     * @returns 
+     */
     private updateCameraFollow(dt: number) {
 
         if (this.entityContainerCom.getEntity("entity_start").state != EntityState.MOVING) return
@@ -258,7 +272,7 @@ export default class Main extends cc.Component {
 
 
         if (!this.cameraFollowBounds.contains(entityWorldPos)) {
-            const delta = Math.min((dt * 1000) / 1000, 1)
+            const delta = Math.min((dt * 1000) / (1000 / this.mapOriSize.scale), 1)
             const offsetPos = cc.v2(viewportCentPos.x - entityWorldPos.x, viewportCentPos.y - entityWorldPos.y)
 
             if (!offsetPos.equals(cc.Vec2.ZERO)) {
@@ -277,7 +291,9 @@ export default class Main extends cc.Component {
 
     }
 
-    // 更新可视地图、迷雾瓦片(立即)
+    /**
+     * 更新可视地图、迷雾瓦片(立即)
+     */
     private updateVisibleTiles() {
 
         const viewportBoundX = (0 - this.viewPort.width / 2) - this.map_container.x
@@ -294,7 +310,9 @@ export default class Main extends cc.Component {
 
     }
 
-    // 更新可视地图、迷雾瓦片(节流)
+    /**
+     * 更新可视地图、迷雾瓦片(节流)
+     */
     @throttle(500)
     private updateVisibleTilesThrottle() {
 
@@ -311,6 +329,52 @@ export default class Main extends cc.Component {
         console.timeEnd("update:fovTile")
 
     }
+
+    /**
+     * 更新地图缩放(立即)
+     * @param scale 
+     * @returns 
+     */
+    private updateMapScale(scale: number) {
+        if (scale <= 0.5 || scale >= 2) return
+        this.mapContainerCom.setScale(scale)
+        this.entityContainerCom.setScale(scale)
+        this.graphicsContainerCom.setScale(scale)
+        this.mapOriSize.scale = scale
+        this.updateVisibleTiles()
+    }
+
+    /**
+     * 更新地图缩放(节流)
+     * @param scale 
+     * @returns 
+     */
+    @throttle(50)
+    private updateMapScaleThrottle(scale: number) {
+        if (scale <= 0.5 || scale >= 2) return
+
+        const prePos = this.map_container.position.clone()
+        const preScale = this.mapOriSize.scale
+
+        // 更新相关容器缩放
+        this.mapContainerCom.setScale(scale)
+        this.entityContainerCom.setScale(scale)
+        this.graphicsContainerCom.setScale(scale)
+        this.mapOriSize.scale = scale
+
+        // 更新回滚容器位置
+        const rollBackDelta = (1 + (scale - preScale) / preScale)
+        const rollBackPos = cc.v3(prePos.x * rollBackDelta, prePos.y * rollBackDelta)
+        this.map_container.position = rollBackPos
+        this.graphics_container.position = rollBackPos
+        this.entity_container.position = rollBackPos
+        this.fov_container.position = rollBackPos
+        this.cameraTargetPos = rollBackPos
+
+
+        this.updateVisibleTiles()
+    }
+
 
     protected update(dt: number): void {
         this.updateCameraPos(dt)

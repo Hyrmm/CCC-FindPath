@@ -5,15 +5,24 @@ const { ccclass, property } = cc._decorator;
 @ccclass
 export default class MapContainer extends cc.Component {
 
+    private mapScale: number = 1
+
     private mapQuadTree: QuadTree<tileMapData> = null
     private mapQuadSize: number = 16
     private mapTileSize: { width: number, height: number } = { width: 448, height: 256 }
 
     start() {
-
     }
 
-    public initMapQuadTree(mapOriSize: { width: number, height: number }) {
+    public setScale(scale: number) {
+        this.mapScale = scale
+        this.node.scale = scale
+    }
+
+    public initMapQuadTree(mapOriSize: { width: number, height: number, scale: number }) {
+        this.mapScale = mapOriSize.scale
+        this.node.scale = mapOriSize.scale
+
         const boundsPosX = -mapOriSize.width / 2
         const boundsPosY = -mapOriSize.height / 2
         const boundsWidth = mapOriSize.width
@@ -36,6 +45,7 @@ export default class MapContainer extends cc.Component {
             const tilePosY = -mapOriSize.height / 2 + (this.mapQuadSize - rows) * this.mapTileSize.height + halfTileHeight
             tileNode.setPosition(tilePosX, tilePosY)
             tileNode.setAnchorPoint(0.5, 0.5)
+            tileNode.addComponent(cc.Sprite)
             this.node.addChild(tileNode)
 
             // 建立基于世界坐标碰撞矩形
@@ -49,23 +59,28 @@ export default class MapContainer extends cc.Component {
         }
     }
 
-    public retrieve(rect: QuadTreeRect) {
-        return this.mapQuadTree.retrieve(rect)
-    }
-
     public updateVisableTiles(rect: QuadTreeRect) {
+
+        // 计算缩放后的视口矩形
+        const viewportRect: QuadTreeRect = {
+            x: rect.x / this.mapScale,
+            y: rect.y / this.mapScale,
+            width: rect.width / this.mapScale,
+            height: rect.height / this.mapScale
+        }
+
         // 判断视口与地图四叉树碰撞
-        const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(rect)
+        const visiableTileObjects: tileMapData[] = this.mapQuadTree.retrieve(viewportRect)
 
         // 动态显示可视区域地图块节点
         this.node.children.forEach((node: cc.Node) => node.active = false)
 
         for (const tileObject of visiableTileObjects) {
             tileObject.node.active = true
-            if (tileObject.node.getComponent(cc.Sprite)) continue
+            if (tileObject.node.getComponent(cc.Sprite).spriteFrame) continue
 
             cc.resources.load(tileObject.node.name, cc.SpriteFrame, (err, spriteFrame) => {
-                tileObject.node.addComponent(cc.Sprite).spriteFrame = spriteFrame
+                tileObject.node.getComponent(cc.Sprite).spriteFrame = spriteFrame
             })
         }
     }

@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:54:52 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-03 02:06:02
+ * @Last Modified time: 2024-05-11 17:02:54
  */
 
 const { ccclass, property } = cc._decorator;
@@ -48,6 +48,10 @@ export default class EntityContainer extends cc.Component {
         this.entities.get(entityName).curCommonPos = null
     }
 
+    public setScale(scale: number) {
+        this.node.scale = scale
+    }
+
     /**
      * 常规移动算法，v=s*t
      * @param dt 
@@ -60,7 +64,7 @@ export default class EntityContainer extends cc.Component {
             if (!entity.curCommonPos) entity.curCommonPos = entity.commonPos.shift()
 
             entity.state = EntityState.MOVING
-            
+
             const distanceVec = entity.curCommonPos.sub(cc.v2(entity.position.x, entity.position.y))
             const distance = distanceVec.mag()
 
@@ -107,21 +111,6 @@ export default class EntityContainer extends cc.Component {
     }
 
 }
-
-// export class Entity extends cc.Node {
-
-//     private commonPos?: Array<cc.Vec2>
-//     private curCommonPos?: cc.Vec2 | null
-//     private shadowPos?: Array<cc.Vec2>
-//     private curShadowPos?: cc.Vec2 | null
-
-//     state: EntityState = EntityState.IDLE
-
-//     constructor(name: string) {
-//         super(name)
-//     }
-// }
-
 
 export type Entity = {
     state?: EntityState | undefined

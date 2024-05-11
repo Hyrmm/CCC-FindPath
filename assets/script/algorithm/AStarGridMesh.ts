@@ -1,10 +1,9 @@
 /*
  * @Author: hyrm 
- * @Date: 2024-04-29 22:47:35 
+ * @Date: 2024-05-11 14:43:54 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-04 15:16:28
+ * @Last Modified time: 2024-05-11 16:58:10
  */
-import { GraphMatrix } from "../dataStructure/Graph"
 import { MinHeap, HeapItem } from "../dataStructure/Heap"
 import { getLineFunc } from "../utils/Utils"
 
@@ -43,27 +42,25 @@ export class AStarGridMesh {
     private static instance: AStarGridMesh
 
     static getInstance(): AStarGridMesh {
-        if (!AStarGridMesh.instance) {
-            AStarGridMesh.instance = new AStarGridMesh()
-        }
+        if (!AStarGridMesh.instance) AStarGridMesh.instance = new AStarGridMesh()
         return AStarGridMesh.instance
     }
 
     private blocks: Array<Array<Block>> = []
 
-    private blockWidth: number
-    private blockHeight: number
+    private oriMapWidth: number
+    private oriMapHeight: number
+    private oriBlockWidth: number
+    private oriBlockHeight: number
 
     private mapWidth: number
     private mapHeight: number
+    private blockWidth: number
+    private blockHeight: number
 
     private openListMap: Map<Block, Block> = new Map()
     private openListHeap: MinHeap<Block> = new MinHeap<Block>([])
     private closeListMap: Map<Block, Block> = new Map()
-
-    constructor() {
-
-    }
 
     public reset(mapData: MapData): AStarGridMesh {
         // 构建格子地图
@@ -81,9 +78,13 @@ export class AStarGridMesh {
 
         this.mapWidth = mapData.mapWidth
         this.mapHeight = mapData.mapHeight
-
         this.blockWidth = mapData.nodeWidth
         this.blockHeight = mapData.nodeHeight
+
+        this.oriMapWidth = mapData.mapWidth
+        this.oriMapHeight = mapData.mapHeight
+        this.oriBlockWidth = mapData.nodeWidth
+        this.oriBlockHeight = mapData.nodeHeight
 
         return this
     }
@@ -344,11 +345,11 @@ export class AStarGridMesh {
         }
     }
 
-
     /**
      * 判断两节点之间是否存在障碍物 
      * @param startBlock 
      * @param endBlock 
+     * @returns 
      */
     public hasBarrier(startBlock: Block, endBlock: Block): boolean {
 
@@ -404,6 +405,7 @@ export class AStarGridMesh {
 
     /**
      * 路径平滑处理，合并共线点，去除拐点
+     * @param path 路径点数组
      */
     public smoothingPath(path: Array<Block>): { collinearRes: Array<Block>, smoothRes: Array<Block> } {
         let len

@@ -12,6 +12,9 @@ export default class GraphicsContainer extends cc.Component {
     protected start(): void {
 
     }
+    public setScale(scale: number) {
+        this.node.scale = scale
+    }
 
     public drawMapMesh() {
         this.clear(GraphicsType.MESH)

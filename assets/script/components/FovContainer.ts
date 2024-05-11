@@ -48,14 +48,6 @@ export default class FovContainer extends cc.Component {
         // console.log(this.fovQuadTree)
     }
 
-    public retrieve(rect: QuadTreeRect) {
-        return this.fovQuadTree.retrieve(rect)
-    }
-
-    public retrieveExt(rect: QuadTreeRect) {
-        return this.fovQuadTree.retrieveExt(rect)
-    }
-
     public updateVisableTiles(rect: QuadTreeRect) {
         // const visibleFovTiles = this.fovQuadTree.retrieve(rect)
 
