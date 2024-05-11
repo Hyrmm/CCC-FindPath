@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-11 18:16:24
+ * @Last Modified time: 2024-05-11 18:19:13
  */
 
 const { ccclass, property } = cc._decorator
@@ -353,25 +353,26 @@ export default class Main extends cc.Component {
     private updateMapScaleThrottle(scale: number) {
         if (scale <= 0.5 || scale >= 2) return
 
-        const prePos = this.map_container.position.clone()
-        const preScale = this.mapOriSize.scale
-
         // 更新相关容器缩放
         this.mapContainerCom.setScale(scale)
         this.entityContainerCom.setScale(scale)
         this.graphicsContainerCom.setScale(scale)
-        this.mapOriSize.scale = scale
 
-        // 更新回滚容器位置
+        // 更新相关容器位置
+        const prePos = this.map_container.position.clone()
+        const preScale = this.mapOriSize.scale
+
         const rollBackDelta = (1 + (scale - preScale) / preScale)
         const rollBackPos = cc.v3(prePos.x * rollBackDelta, prePos.y * rollBackDelta)
+
         this.map_container.position = rollBackPos
         this.graphics_container.position = rollBackPos
         this.entity_container.position = rollBackPos
         this.fov_container.position = rollBackPos
         this.cameraTargetPos = rollBackPos
 
-
+        // 更新可视瓦片
+        this.mapOriSize.scale = scale
         this.updateVisibleTiles()
     }
 
