@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-11 18:27:45
+ * @Last Modified time: 2024-05-19 21:31:23
  */
 
 const { ccclass, property } = cc._decorator
@@ -13,6 +13,7 @@ import GraphicsContainer, { GraphicsType } from './script/components/GraphicsCon
 import FovContainer from './script/components/FovContainer'
 import MapContainer from './script/components/MapContainer'
 import { outPutJsonFile, throttle } from './script/utils/Utils'
+import { KdTree } from './script/dataStructure/KdTree'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -102,6 +103,11 @@ export default class Main extends cc.Component {
 
         // 首次地图可视范围更新
         this.scheduleOnce(this.updateVisibleTiles.bind(this), 0.1)
+
+        const points = [[3, 7], [2, 6], [0, 5], [1, 8], [7, 5], [5, 4], [6, 7]]
+        const rootNode = KdTree.build(points)
+
+        console.log(rootNode.searchNearest([5, 5.5]))
     }
 
     private initEventListener() {
