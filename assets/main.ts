@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-19 21:31:23
+ * @Last Modified time: 2024-05-20 17:25:44
  */
 
 const { ccclass, property } = cc._decorator
@@ -107,7 +107,7 @@ export default class Main extends cc.Component {
         const points = [[3, 7], [2, 6], [0, 5], [1, 8], [7, 5], [5, 4], [6, 7]]
         const rootNode = KdTree.build(points)
 
-        console.log(rootNode.searchNearest([5, 5.5]))
+        console.log(rootNode.searchKNearest([5, 5.5], 1))
     }
 
     private initEventListener() {

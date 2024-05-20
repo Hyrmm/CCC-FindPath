@@ -1,8 +1,9 @@
+import { MaxHeap } from './Heap';
 /*
  * @Author: hyrm 
  * @Date: 2024-05-20 00:28:15 
- * @Last Modified by:   hyrm 
- * @Last Modified time: 2024-05-20 00:28:15 
+ * @Last Modified by: hyrm
+ * @Last Modified time: 2024-05-20 17:24:04
  */
 type Point = Array<number>
 
@@ -21,6 +22,11 @@ export class KdTree {
         this.right = right
     }
 
+    /**
+     * 返回直到叶节点访问路径
+     * @param point 
+     * @returns 
+     */
     public serach2Leaf(point: Point): Array<KdTree> {
         const result: Array<KdTree> = []
 
@@ -37,25 +43,39 @@ export class KdTree {
         return result
     }
 
-    public searchNearest(point: Point): Point | null {
+    /**
+     * k-近邻搜索(k>=1),k=1即最近邻近点，取返回值下标0即可
+     * @param point 目标点
+     * @param k 近邻个数
+     * @param maxHeap 大
+     * @returns 
+     */
+    public searchKNearest(point: Point, k: number = 1, maxHeap?: MaxHeap<{ value: number, point: Point }>): Array<{ value: number, point: Point }> {
+
+        // 初始化大顶堆，类top-k算法，维护一个节点数为k的最大堆
+        if (!maxHeap) {
+            maxHeap = new MaxHeap<{ value: number, point: Point }>([])
+            for (let i = 0; i < k; i++) maxHeap.push({ value: Infinity, point: null })
+        }
 
         let stack: Array<KdTree> = this.serach2Leaf(point)
 
-        let nearestPoint = stack[stack.length - 1].data
-        let nearestDistance = KdTree.distance(point, stack[stack.length - 1].data)
-
-        //回溯
+        //叶节点路径回溯
         while (stack.length) {
+            const topNearestDistance = maxHeap.peek().value
 
             const current: KdTree = stack.pop()
             const currentDistance = KdTree.distance(point, current.data)
-            nearestPoint = currentDistance < nearestDistance? current.data : nearestPoint
-            nearestDistance = currentDistance < nearestDistance ? currentDistance : nearestDistance
 
-            // 与超平面分割线相交
-            if (Math.abs(point[current.axis] - current.data[current.axis]) < nearestDistance) {
+            // 小于大顶堆顶，替换加入堆中
+            if (currentDistance < topNearestDistance) {
+                maxHeap.pop()
+                maxHeap.push({ value: currentDistance, point: current.data })
+            }
 
-                // 左子树|右子树是否加入回溯栈
+            // 判断与超平面分割线相交，子树加入搜索区间
+            if (Math.abs(point[current.axis] - current.data[current.axis]) < topNearestDistance) {
+
                 let next: KdTree | null
                 if (point[current.axis] < current.data[current.axis]) {
                     next = current.right
@@ -63,15 +83,21 @@ export class KdTree {
                     next = current.left
                 }
 
+                // 子树存在，加入回溯栈
                 if (next) stack = stack.concat(next.serach2Leaf(point))
             }
-
         }
 
-        return nearestPoint
+        return maxHeap.toArray()
     }
 
-
+    /**
+     * 构建k维树
+     * @param points 点集
+     * @param axis 切割轴(切割维度)
+     * @param k 维度
+     * @returns 
+     */
     static build(points: Array<Point>, axis: number = 0, k: number = 2): KdTree | null {
         if (points.length === 0) return null
 
@@ -98,7 +124,7 @@ export class KdTree {
     /**
      * 按照给定维度对点集排序
      * @param points 点集
-     * @param axis 维度
+     * @param axis 轴(维度)
      * @returns 
      */
     static sortByAxis(points: Array<Point>, axis: number): Array<Point> {
