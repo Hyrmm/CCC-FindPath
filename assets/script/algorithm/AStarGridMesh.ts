@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-05-11 14:43:54 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-11 16:58:10
+ * @Last Modified time: 2024-05-21 09:43:12
  */
 import { MinHeap, HeapItem } from "../dataStructure/Heap"
 import { getLineFunc } from "../utils/Utils"
@@ -48,11 +48,6 @@ export class AStarGridMesh {
 
     private blocks: Array<Array<Block>> = []
 
-    private oriMapWidth: number
-    private oriMapHeight: number
-    private oriBlockWidth: number
-    private oriBlockHeight: number
-
     private mapWidth: number
     private mapHeight: number
     private blockWidth: number
@@ -80,11 +75,6 @@ export class AStarGridMesh {
         this.mapHeight = mapData.mapHeight
         this.blockWidth = mapData.nodeWidth
         this.blockHeight = mapData.nodeHeight
-
-        this.oriMapWidth = mapData.mapWidth
-        this.oriMapHeight = mapData.mapHeight
-        this.oriBlockWidth = mapData.nodeWidth
-        this.oriBlockHeight = mapData.nodeHeight
 
         return this
     }

@@ -3,19 +3,19 @@ import { MaxHeap } from './Heap';
  * @Author: hyrm 
  * @Date: 2024-05-20 00:28:15 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-20 17:24:04
+ * @Last Modified time: 2024-05-22 16:30:34
  */
-type Point = Array<number>
+export type Point = Array<number>
 
 
-export class KdTree {
+export class KdTree<T extends { point: Point }>{
 
     private axis: number
-    private data: Point
-    private left: KdTree | null
-    private right: KdTree | null
+    private data: T
+    private left: KdTree<T> | null
+    private right: KdTree<T> | null
 
-    constructor(data: Point, left: KdTree, right: KdTree, axis: number) {
+    constructor(data: T, left: KdTree<T>, right: KdTree<T>, axis: number) {
         this.axis = axis
         this.data = data
         this.left = left
@@ -27,13 +27,13 @@ export class KdTree {
      * @param point 
      * @returns 
      */
-    public serach2Leaf(point: Point): Array<KdTree> {
-        const result: Array<KdTree> = []
+    public serach2Leaf(point: Point): Array<KdTree<T>> {
+        const result: Array<KdTree<T>> = []
 
-        let current: KdTree | null = this
+        let current: KdTree<T> | null = this
         while (current) {
             result.push(current)
-            if (point[current.axis] < current.data[current.axis]) {
+            if (point[current.axis] < current.data.point[current.axis]) {
                 current = current.left
             } else {
                 current = current.right
@@ -44,39 +44,39 @@ export class KdTree {
     }
 
     /**
-     * k-近邻搜索(k>=1),k=1即最近邻近点，取返回值下标0即可
+     * k-近邻搜索(k>=1),k=1即最近邻近点
      * @param point 目标点
      * @param k 近邻个数
      * @param maxHeap 大
      * @returns 
      */
-    public searchKNearest(point: Point, k: number = 1, maxHeap?: MaxHeap<{ value: number, point: Point }>): Array<{ value: number, point: Point }> {
+    public searchKNearest(point: Point, k: number = 1, maxHeap?: MaxHeap<{ value: number, data: T }>): Array<{ value: number, data: T }> {
 
         // 初始化大顶堆，类top-k算法，维护一个节点数为k的最大堆
         if (!maxHeap) {
-            maxHeap = new MaxHeap<{ value: number, point: Point }>([])
-            for (let i = 0; i < k; i++) maxHeap.push({ value: Infinity, point: null })
+            maxHeap = new MaxHeap<{ value: number, data: T }>([])
+            for (let i = 0; i < k; i++) maxHeap.push({ value: Infinity, data: null })
         }
 
-        let stack: Array<KdTree> = this.serach2Leaf(point)
+        let stack: Array<KdTree<T>> = this.serach2Leaf(point)
 
         //叶节点路径回溯
         while (stack.length) {
             const topNearestDistance = maxHeap.peek().value
 
-            const current: KdTree = stack.pop()
-            const currentDistance = KdTree.distance(point, current.data)
+            const current: KdTree<T> = stack.pop()
+            const currentDistance = KdTree.distance(point, current.data.point)
 
             // 小于大顶堆顶，替换加入堆中
-            if (currentDistance < topNearestDistance) {
+            if (currentDistance < topNearestDistance && (point[0] !== current.data.point[0] && point[1] !== current.data.point[1])) {
                 maxHeap.pop()
-                maxHeap.push({ value: currentDistance, point: current.data })
+                maxHeap.push({ value: currentDistance, data: current.data })
             }
 
             // 判断与超平面分割线相交，子树加入搜索区间
             if (Math.abs(point[current.axis] - current.data[current.axis]) < topNearestDistance) {
 
-                let next: KdTree | null
+                let next: KdTree<T> | null
                 if (point[current.axis] < current.data[current.axis]) {
                     next = current.right
                 } else {
@@ -98,16 +98,16 @@ export class KdTree {
      * @param k 维度
      * @returns 
      */
-    static build(points: Array<Point>, axis: number = 0, k: number = 2): KdTree | null {
-        if (points.length === 0) return null
+    static build<T extends { point: Point }>(datas: Array<T>, axis: number = 0, k: number = 2): KdTree<T> | null {
+        if (datas.length === 0) return null
 
-        points = KdTree.sortByAxis(points, axis)
+        datas = KdTree.sortByAxis(datas, axis)
 
-        const midIndex = Math.floor(points.length / 2)
-        const leftPoints = points.slice(0, midIndex)
-        const rightPoints = points.slice(midIndex + 1)
+        const midIndex = Math.floor(datas.length / 2)
+        const leftPoints = datas.slice(0, midIndex)
+        const rightPoints = datas.slice(midIndex + 1)
 
-        return new KdTree(points[midIndex], KdTree.build(leftPoints, (axis + 1) % k), KdTree.build(rightPoints, (axis + 1) % k), axis)
+        return new KdTree<T>(datas[midIndex], KdTree.build(leftPoints, (axis + 1) % k), KdTree.build(rightPoints, (axis + 1) % k), axis)
 
     }
 
@@ -127,8 +127,8 @@ export class KdTree {
      * @param axis 轴(维度)
      * @returns 
      */
-    static sortByAxis(points: Array<Point>, axis: number): Array<Point> {
-        return points.sort((a, b) => a[axis] - b[axis])
+    static sortByAxis<T>(datas: Array<T & { point: Point }>, axis: number): Array<T> {
+        return datas.sort((a, b) => a.point[axis] - b.point[axis])
     }
 
 }

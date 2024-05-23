@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-20 17:25:44
+ * @Last Modified time: 2024-05-22 14:13:33
  */
 
 const { ccclass, property } = cc._decorator
@@ -13,7 +13,7 @@ import GraphicsContainer, { GraphicsType } from './script/components/GraphicsCon
 import FovContainer from './script/components/FovContainer'
 import MapContainer from './script/components/MapContainer'
 import { outPutJsonFile, throttle } from './script/utils/Utils'
-import { KdTree } from './script/dataStructure/KdTree'
+import { Simulator } from './script/algorithm/ROV2'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -105,9 +105,16 @@ export default class Main extends cc.Component {
         this.scheduleOnce(this.updateVisibleTiles.bind(this), 0.1)
 
         const points = [[3, 7], [2, 6], [0, 5], [1, 8], [7, 5], [5, 4], [6, 7]]
-        const rootNode = KdTree.build(points)
+        // const rootNode = KdTree.build(points)
 
-        console.log(rootNode.searchKNearest([5, 5.5], 1))
+        // console.log(rootNode.searchKNearest([5, 5.5], 1))
+        for (const point of points) {
+            Simulator.getInstance().addAgent(cc.v2(point[0], point[1]))
+        }
+
+
+        Simulator.getInstance().execute(1)
+
     }
 
     private initEventListener() {
