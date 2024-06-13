@@ -8,7 +8,7 @@ import { MaxHeap } from './Heap';
 export type Point = Array<number>
 
 
-export class KdTree<T extends { point: Point }>{
+export class KdTree<T extends { point: Point }> {
 
     private axis: number
     private data: T
@@ -110,7 +110,7 @@ export class KdTree<T extends { point: Point }>{
             const current: KdTree<T> = stack.pop()
             const currentDistance = KdTree.distance(point, current.data.point)
 
-            if (currentDistance <= radius) {
+            if (currentDistance <= radius && currentDistance != 0) {
                 if (maxHeap.size >= 10) maxHeap.pop()
                 maxHeap.push({ value: currentDistance, data: current.data })
             }

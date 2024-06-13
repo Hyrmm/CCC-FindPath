@@ -106,14 +106,12 @@ export default class Main extends cc.Component {
         this.scheduleOnce(this.updateVisibleTiles.bind(this), 0.1)
 
         const points = [{ point: [3, 7] }, { point: [2, 6] }, { point: [0, 5] }, { point: [1, 8] }, { point: [7, 5] }, { point: [5, 4] }, { point: [6, 7] }]
-        const rootNode = KdTree.build(points)
-
         for (const point of points) {
-            Simulator.getInstance().addAgent(cc.v2(point.point[0], point.point[1]))
+            Simulator.addAgent(cc.v2(point.point[0], point.point[1]))
         }
 
 
-        Simulator.getInstance().execute(1)
+        Simulator.execute(1)
 
     }
 

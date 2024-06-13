@@ -25,78 +25,62 @@ export class Line {
 export class Agent {
 
     public id: number
-
-    // 圆的半径
     public radius: number
-
-    // 避障权重
     public weight: number
 
-    // 当前位置
-    public position: cc.Vec2
-
-    // 目标位置
+    public pos: cc.Vec2
     public targetPos: cc.Vec2
 
-    // 当前速度
     public velocity: cc.Vec2
-
-    // 期望速度
     public prefVelocity: cc.Vec2
 
     public point: Point
 
-}
+    constructor(pos: cc.Vec2) {
+        this.id = Simulator.agents.push(this)
 
-export class Simulator {
+        this.pos = pos
 
-    private static instance: Simulator
+        this.radius = 5
+        this.weight = 0.5
 
-    public agents: Array<Agent> = []
-    public agentsTree: KdTree<Agent> = null
+        this.velocity = cc.v2(0, 0)
+        this.prefVelocity = cc.v2(0, 0)
 
-    public static getInstance(): Simulator {
-        if (!Simulator.instance) Simulator.instance = new Simulator()
-        return Simulator.instance
+        this.point = [pos.x, pos.y]
     }
 
-    public execute(dt: number): void {
+    public calcNewVelocity() {
 
-        const points = new Array<Point>(this.agents.length)
-        for (const agent of this.agents) points.push([agent.position.x, agent.position.y])
-
-        this.agentsTree = KdTree.build(this.agents)
-
-        // 计算每个Agent的期望速度
-        for (const agent of this.agents) {
-            const newVelocity = this.calcNewVelocity(agent)
-
-        }
-
-
-    }
-
-    public addAgent(pos: cc.Vec2): Agent {
-        const agent = new Agent()
-
-        agent.id = this.agents.push(agent)
-        agent.position = pos
-        agent.velocity = cc.v2(0, 0)
-        agent.prefVelocity = cc.v2(0, 0)
-        agent.radius = 5
-        agent.weight = 0.5
-        agent.point = [pos.x, pos.y]
-
-        return agent
-    }
-
-    public calcNewVelocity(agent: Agent): void {
-
-        const neighbors = this.agentsTree.searchNeiborRadius(agent.point, agent.radius)
+        const neighbors = Simulator.agentsTree.searchNeiborRadius([this.pos.x, this.pos.y], this.radius)
         for (const neighbor of neighbors) {
             console.log(neighbor)
         }
     }
+}
 
+export class Simulator {
+
+    static agents: Array<Agent> = []
+    static agentsTree: KdTree<Agent> = null
+
+    static execute(dt: number): void {
+
+        // 重新构建KDTree
+        this.agentsTree = KdTree.build(this.agents)
+
+        // 计算每个Agent的期望速度
+        this.agents.forEach(agent => agent.calcNewVelocity())
+
+
+    }
+
+    static addAgent(pos: cc.Vec2): Agent {
+        return new Agent(pos)
+    }
+
+    static getAgent(id: number): Agent {
+        return this.agents[id]
+    }
 
 }
