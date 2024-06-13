@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-05-21 09:44:10 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-22 16:24:08
+ * @Last Modified time: 2024-06-13 14:35:10
  */
 
 import { KdTree, Point } from '../dataStructure/KdTree';
@@ -83,7 +83,7 @@ export class Simulator {
         agent.position = pos
         agent.velocity = cc.v2(0, 0)
         agent.prefVelocity = cc.v2(0, 0)
-        agent.radius = 10
+        agent.radius = 5
         agent.weight = 0.5
         agent.point = [pos.x, pos.y]
 
@@ -92,9 +92,9 @@ export class Simulator {
 
     public calcNewVelocity(agent: Agent): void {
 
-        const neighbors = this.agentsTree.searchKNearest(agent.point)
+        const neighbors = this.agentsTree.searchNeiborRadius(agent.point, agent.radius)
         for (const neighbor of neighbors) {
-                        
+            console.log(neighbor)
         }
     }
 

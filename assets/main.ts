@@ -2,7 +2,7 @@
  * @Author: hyrm 
  * @Date: 2024-04-27 17:10:42 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-22 14:13:33
+ * @Last Modified time: 2024-06-13 17:55:39
  */
 
 const { ccclass, property } = cc._decorator
@@ -14,6 +14,7 @@ import FovContainer from './script/components/FovContainer'
 import MapContainer from './script/components/MapContainer'
 import { outPutJsonFile, throttle } from './script/utils/Utils'
 import { Simulator } from './script/algorithm/ROV2'
+import { KdTree } from './script/dataStructure/KdTree'
 @ccclass
 export default class Main extends cc.Component {
 
@@ -104,12 +105,11 @@ export default class Main extends cc.Component {
         // 首次地图可视范围更新
         this.scheduleOnce(this.updateVisibleTiles.bind(this), 0.1)
 
-        const points = [[3, 7], [2, 6], [0, 5], [1, 8], [7, 5], [5, 4], [6, 7]]
-        // const rootNode = KdTree.build(points)
+        const points = [{ point: [3, 7] }, { point: [2, 6] }, { point: [0, 5] }, { point: [1, 8] }, { point: [7, 5] }, { point: [5, 4] }, { point: [6, 7] }]
+        const rootNode = KdTree.build(points)
 
-        // console.log(rootNode.searchKNearest([5, 5.5], 1))
         for (const point of points) {
-            Simulator.getInstance().addAgent(cc.v2(point[0], point[1]))
+            Simulator.getInstance().addAgent(cc.v2(point.point[0], point.point[1]))
         }
 
 

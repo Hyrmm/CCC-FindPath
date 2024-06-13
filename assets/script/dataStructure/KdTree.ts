@@ -3,7 +3,7 @@ import { MaxHeap } from './Heap';
  * @Author: hyrm 
  * @Date: 2024-05-20 00:28:15 
  * @Last Modified by: hyrm
- * @Last Modified time: 2024-05-22 16:30:34
+ * @Last Modified time: 2024-06-13 11:36:16
  */
 export type Point = Array<number>
 
@@ -23,7 +23,7 @@ export class KdTree<T extends { point: Point }>{
     }
 
     /**
-     * 返回直到叶节点访问路径
+     * 返回到叶节点访问路径
      * @param point 
      * @returns 
      */
@@ -47,7 +47,7 @@ export class KdTree<T extends { point: Point }>{
      * k-近邻搜索(k>=1),k=1即最近邻近点
      * @param point 目标点
      * @param k 近邻个数
-     * @param maxHeap 大
+     * @param maxHeap
      * @returns 
      */
     public searchKNearest(point: Point, k: number = 1, maxHeap?: MaxHeap<{ value: number, data: T }>): Array<{ value: number, data: T }> {
@@ -74,10 +74,52 @@ export class KdTree<T extends { point: Point }>{
             }
 
             // 判断与超平面分割线相交，子树加入搜索区间
-            if (Math.abs(point[current.axis] - current.data[current.axis]) < topNearestDistance) {
+            if (Math.abs(point[current.axis] - current.data.point[current.axis]) < topNearestDistance) {
 
                 let next: KdTree<T> | null
-                if (point[current.axis] < current.data[current.axis]) {
+                if (point[current.axis] < current.data.point[current.axis]) {
+                    next = current.right
+                } else {
+                    next = current.left
+                }
+
+                // 子树存在，加入回溯栈
+                if (next) stack = stack.concat(next.serach2Leaf(point))
+            }
+        }
+
+        return maxHeap.toArray()
+    }
+
+    /**
+     * 目标点给定范围(半径)搜索邻居
+     * @param point 目标点
+     * @param radius 半径
+     * @param maxHeap 
+     * @returns 
+     */
+    public searchNeiborRadius(point: Point, radius: number, maxHeap?: MaxHeap<{ value: number, data: T }>): Array<{ value: number, data: T }> {
+
+        let stack: Array<KdTree<T>> = this.serach2Leaf(point)
+
+        // 初始化大顶堆，类top-k算法，维护一个节点数为k的最大堆
+        if (!maxHeap) maxHeap = new MaxHeap<{ value: number, data: T }>([])
+
+        while (stack.length) {
+
+            const current: KdTree<T> = stack.pop()
+            const currentDistance = KdTree.distance(point, current.data.point)
+
+            if (currentDistance <= radius) {
+                if (maxHeap.size >= 10) maxHeap.pop()
+                maxHeap.push({ value: currentDistance, data: current.data })
+            }
+
+            // 判断与超平面分割线相交，子树加入搜索区间
+            if (Math.abs(point[current.axis] - current.data.point[current.axis]) < radius) {
+
+                let next: KdTree<T> | null
+                if (point[current.axis] < current.data.point[current.axis]) {
                     next = current.right
                 } else {
                     next = current.left
